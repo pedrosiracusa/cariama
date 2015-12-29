@@ -15,6 +15,7 @@ Package:     CARIAMA Media Archive Utilities
 """
 
 import os, shutil
+import indexing as indx
 import filecmp
 
 __author__ = "Pedro Correia de Siracusa"
@@ -40,11 +41,7 @@ class File:
                 raise FileNotFoundError("File instance could not be linked to None input file")  
         
         self.__mediaType = mediaType
-
-        
-        
-    ''' Get Methods '''
-    
+ 
     def exists(self):
         ''' Checks whether input file path exists. Defaults to instance's filePath attribute '''
         filePath = self.__filePath
@@ -87,11 +84,6 @@ class File:
     def getMediaType(self):
         return(self.__mediaType)
     
-    
-    
-    
-    ''' Set Methods '''
-   
     def setMediaType(self, mediaType):
         ''' 
             Defines the type of media based on file's extension
@@ -113,7 +105,28 @@ class File:
         
         os.rename(self.__filePath, newFilePath)
         self.__filePath = newFilePath
-    
+        
+    def setIndex(self):
+        """ Sets file index based on indexing rules module """
+        # only set index if file is not already indexed
+        if not indx.parseIndex(self.getName()):
+            try:
+                indxPref = indx.getPrefix(self.__mediaType)
+                indxDate = self.getDate()['mtime']
+                indxSuff = self.getSize()
+                index = indx.genIndex(indxPref, indxDate, indxSuff)
+                self.setName(index)
+            
+            except ValueError as e:
+                raise indx.FileIndexingError(e)
+            
+            except FileExistsError as e:
+                raise indx.FileIndexingError(e)
+        # do not re-index file
+        else:
+            raise indx.FileIndexingError("Cannot set index to file %s. File is already indexed!" %(self.__filePath))
+        
+        
     def setDate(self, timestamp, mode="am"):
         ''' 
         Sets file modification or access date using input timestamp
@@ -166,8 +179,7 @@ class File:
             shutil.copystat(self.__filePath, destPath)
             
         return File(destPath, mediaType=self.__mediaType)
-        
-    
+           
     def moveTo(self, destPath):
         ''' 
         Moves file from current path to destination. Checks if file already exists on destination before
@@ -210,7 +222,7 @@ class Directory:
             raise NotADirectoryError("Directory instance could not be linked to None input path")
         
         self.__mediaType = mediaType
-        
+       
     def exists(self):
         """ Checks whether input directory path exists. """
         dirPath = self.__dirPath           

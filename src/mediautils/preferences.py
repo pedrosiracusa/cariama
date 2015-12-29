@@ -11,5 +11,6 @@ INDEX_PREFIX = {
                 'ctraps':"TRDC",
                 'audio':"MSDC",
                 }
+
 INDEX_SUFFIX_LENGTH = 5;
-INDEX_DATETIME = '%Y%m%d%H%M%S'
+INDEX_DATETIME_FORMAT = '%Y%m%d%H%M%S'

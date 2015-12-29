@@ -7,6 +7,7 @@ Created on Dec 20, 2015
 import unittest, os, shutil, filecmp
 from fdmgm import File, Directory
 import indexing as indx
+import preferences as prefs
 
 
 class TestFileMethods(unittest.TestCase):
@@ -139,6 +140,32 @@ class TestFileMethods(unittest.TestCase):
         """ Method .moveTo updates original File instance path to None, to avoid broken link """    
         self.testfile.moveTo("fixtures/move/newfile" + self.testfile.getExt())   
         self.assertIsNone(self.testfile.getPath())
+ 
+    def test_set_index_does_not_accept_invalid_media_type(self):
+        """ setIndex method does not index file with invalid media type """
+        self.testfile.setMediaType(None)
+        with self.assertRaises(indx.FileIndexingError):
+            self.testfile.setIndex()      
+        self.testfile.setMediaType("Unknown")
+        with self.assertRaises(indx.FileIndexingError):
+            self.testfile.setIndex()
+           
+    def test_set_index_renames_unindexed_file(self):  
+        """ setIndex method successfully indexes non-indexed files """
+        validType = next(iter(prefs.INDEX_PREFIX.keys()))
+        self.testfile.setMediaType(validType)
+        self.testfile.setIndex()
+        self.assertTrue(indx.parseIndex(self.testfile.getName()))
+    
+    def test_set_index_does_not_rename_indexed_file(self): 
+        """ setIndex method does not re-index previously indexed files """
+        # first indexing
+        validType = next(iter(prefs.INDEX_PREFIX.keys()))
+        self.testfile.setMediaType(validType)
+        self.testfile.setIndex()
+        # re-indexing raises error
+        with self.assertRaises(indx.FileIndexingError):
+            self.testfile.setIndex()      
              
     def tearDown(self):
         shutil.rmtree(os.path.abspath("fixtures"))
@@ -350,6 +377,21 @@ class TestIndexing(unittest.TestCase):
             f.write(os.urandom(2048))
         self.testFile = File(fpath)
         
+        self.validIndex = "MVDC2010080213445412345"      # just a valid index
+        self.invalidIndex = {                       # a set of invalid indexes
+            'wrongPref': "MCCV2010090213445412345",
+            'noPref': "2010080213445412345",
+            'shortDate': "MVDC201009021344512345",
+            'longDate': "MVDC20100902134454412345",
+            'noDate': "MVDC12345",
+            'invalidDate': "MVDC2010130213445412345",
+            'shortSuff': "MVDC201008021344541234",
+            'longSuff': "MVDC20100802134454123456",
+            'noSuff': "MVDC20100802134454",
+            'noNums': "MVDC",
+            'lettersInNumeric': "MVDC20100802134454MV12345"
+            } 
+        
     def tearDown(self):
         shutil.rmtree(os.path.abspath("fixtures"))
         
@@ -357,12 +399,12 @@ class TestIndexing(unittest.TestCase):
         """ getPrefix() function raises exception for unknown or None media type """     
         self.testFile.setMediaType("unknown")        
         with self.assertRaises(ValueError):
-            indx.getPrefix(self.testFile)
+            indx.getPrefix(self.testFile.getMediaType())
                          
         self.testFile.setMediaType(None)
         with self.assertRaises(ValueError):
             indx.getPrefix(self.testFile)
-   
+
     def test_number_format_to_string_strict(self):     
         """ Tests number-to-string formatting function on strict mode """      
         # Outputs n-lenghted string when number length is smaller than parameter 
@@ -414,24 +456,24 @@ class TestIndexing(unittest.TestCase):
         # Returns None when length < 1    
         self.assertEqual(indx.numberFormatToString(333, length=0, strict=False), None)
         self.assertEqual(indx.numberFormatToString(333, length=-1, strict=False), None)
-
-    def test_indexing_renames_file(self):
-        """ indexFile() function changes file name """
-        oldName = self.testFile.getName()
-        indx.indexFile(self.testFile, prefix="PREF")
-        newName = self.testFile.getName()
-        self.assertNotEqual(oldName, newName)
         
     def test_indexing_auto_prefix_on_unknown_media_file_raises_exception(self):
         """ indexFile() with auto prefix raises exception for unknown or None media types """
-        self.testFile.setMediaType(None)
-        with self.assertRaises(ValueError):
-            indx.indexFile(self.testFile)  
-        self.testFile.setMediaType("unknown")
-        with self.assertRaises(ValueError):
-            indx.indexFile(self.testFile)
+        pass
            
+    def test_index_parser(self):
+        """ Test index parser with some dummy valid and invalid indexes """
+        self.assertTrue(self.validIndex)
+        for key, val in self.invalidIndex.items():
+            self.assertFalse(indx.parseIndex(val))
             
+    def test_index_generator_raises_exception_if_invalid(self):
+        """ Function genIndex() raises value exception if generated index is invalid """
+        invalidPrefix = "MVTC"
+        with self.assertRaises(ValueError):
+            indx.genIndex(invalidPrefix, self.testFile.getDate()['mtime'], self.testFile.getSize())
+        
+
 def main():
     
     open(os.path.abspath("file.txt"),'a').close()

@@ -1,43 +1,56 @@
+#!/usr/bin/env python
 """
-Name:        File Indexing Module
+This module gathers functions for generating and parsing indexes
+of the media file objects, from the FDMGM module
+Some functions operate by changing FDMGM objects properties TODO:REMOVE
+This module operates based on the package's preferences
+
+Name:        CARIAMA Indexing System Module
 Package:     CARIAMA Media Archive Utilities
-
-Author:      Pedro Correia de Siracusa
-
 """
+import re, time
 from datetime import datetime
 from preferences import *
-from fdmgm import File
+from re import IGNORECASE
+from mediautils.preferences import INDEX_DATETIME_FORMAT, INDEX_PREFIX
+
+__author__ = "Pedro Correia de Siracusa"
+__copyright__ = "Copyright 2015, CARIAMA project"
+__credits__ = ["Pedro de Siracusa"]
+
+__licence__ = "Still not defined"
+__version__ = "0.1"
+__maintainer__ = "Pedro de Siracusa"
+__email__ = "pedrosiracusa@gmail.com"
+__status__ = "Development"
 
 
-def getPrefix(file):
+def getPrefix(mediaType):
     ''' Gets prefix for media type based on the preferences module '''
     try:
-        return INDEX_PREFIX[file.getMediaType()]
+        return INDEX_PREFIX[mediaType]
     
     except KeyError:
-        raise ValueError("Unknown media type: %s" %file.getMediaType())
+        raise ValueError("Unknown media type: %s" %mediaType)
 
-def indexFile(file, prefix=None):
+def genIndex(prefix, timestamp, suffixNum):
     ''' 
-    Sets file's index (renames it)
-    Gets default prefix from media type
-    '''
-    dateTime = datetime.fromtimestamp(file.getDate()['mtime'])
-    nameTime = dateTime.strftime(INDEX_DATETIME)
-    suffix = numberFormatToString(file.getSize(), length = INDEX_SUFFIX_LENGTH, strict=False)
+    Generates index based on:
+    @param prefix: String prefix to use
+    @param timestamp: Datetime in timestamp format
+    @param suffixNum: Numeric suffix
+    '''               
+    indx = prefix + \
+            datetime.fromtimestamp(timestamp).strftime(INDEX_DATETIME_FORMAT) + \
+            numberFormatToString(suffixNum, length=INDEX_SUFFIX_LENGTH, strict=False)
+            
+    if not parseIndex(indx):
+        raise ValueError("Could not parse generated index")
     
-    # By default uses auto generated prefix
-    if prefix==None:
-        try:
-            prefix=getPrefix(file)
-        except ValueError:
-            raise ValueError("Cannot autoprefix unknown media file")
-                
-    index=prefix+nameTime+suffix
+    return indx
     
-    file.setName(index)
-  
+
+        
 
 def numberFormatToString(number, length=4, strict=True):
     """ 
@@ -67,16 +80,42 @@ def numberFormatToString(number, length=4, strict=True):
 
 
 
-def parseIndex(file):
+def parseIndex(index, suffLen=INDEX_SUFFIX_LENGTH):
     """
-    Validates the input file's index
-    @TODO
+    Uses regular expressions to validate the input file's index
+    @return: True if input index is valid
+    @return: False if input index is not valid
     """
+    dateLen = len( time.strftime(INDEX_DATETIME_FORMAT, time.localtime(time.clock())) )
+
+    try:
+        pIdx = re.match('(?P<pref>[a-z]+)(?P<date>\d{'+str(dateLen)+'})(?P<suff>\d{'+str(suffLen)+'}$)', index, IGNORECASE).groupdict()
+        assert(pIdx['pref'] in INDEX_PREFIX.values())
+        idxDate=time.strptime(pIdx['date'], INDEX_DATETIME_FORMAT)
+
+        return{
+                'pref': pIdx['pref'], 
+                'datestring': pIdx['date'],
+                'suff': pIdx['suff'],  
+                'datets': time.mktime(idxDate), 
+                'mediatype' : [key for key, value in INDEX_PREFIX.items() if value==pIdx['pref']],         
+               }
+        
+    except Exception: return False
     
+    
+class FileIndexingError(Exception):
     pass
-
+    
 def main():
-    print(indexFile(File(r'C:\Users\PEDRO\Desktop\videos_sentinelas\copy\TRDC2013092519103201.AVI', 'photo-traps')))
-
+    try:
+        if(True):
+            raise FileIndexingError("Hello", "World")
+        else:
+            print("Well done")
+        
+    except FileIndexingError as e:  
+        print(e.args)
+        
 if __name__=='__main__':
     main()
