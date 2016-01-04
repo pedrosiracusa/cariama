@@ -501,18 +501,31 @@ class TestImporting(unittest.TestCase):
         """ Removes fixtures test dirs and files """
         shutil.rmtree(os.path.abspath("fixtures"))
     
-    def test_import_indexing_files_on_import_does_not_rename_original(self):
+    def test_import_indexing_files_copied_on_import_does_not_rename_original(self):
         """ Importing method by copying prevents original file renaming during its routine """
         origName = self.testfile1.getName()
-        mgm.importFilesToQuarantine([self.testfile1], 
-                                    mediaType=self.validMediaType, 
-                                    copy=True, 
-                                    indexing=True, 
-                                    dstRootPath = self.testQuarantine)
+        self.testfile1.setMediaType(self.validMediaType)
+        mgm.importFiles([self.testfile1], 
+                        dstRootPath=self.testQuarantine,
+                        copy=True,
+                        indexing=True)
         self.assertEqual(origName, self.testfile1.getName())
           
     def test_import_copying_files_rollsback_if_importing_fails(self):
-        pass
+        """ If there is an issue with importing a file by copy, the operation rolls back """
+        self.testfile1.setMediaType(self.validMediaType)
+        testfile3 = self.testfile1.copyTo(os.path.abspath("fixtures/mediafile3.dat"), preserveDate=True, strict=False)
+        # Error importing: file already exists
+        with self.assertRaises(mgm.FileImportingError):
+            mgm.importFiles([self.testfile1, testfile3],
+                            dstRootPath=self.testQuarantine, 
+                            copy=True, 
+                            indexing=True)
+        # Error importing: file already exists with the same index
+        self.testfile1.setIndex()
+        # original file was preserved
+        print(testfile3.getPath())
+        print(self.testfile1.getPath())
     
     def test_import_moving_files_rollsback_if_importing_fails(self):
         pass

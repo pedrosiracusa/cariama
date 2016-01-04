@@ -18,6 +18,7 @@ import os, stat, shutil
 import indexing as indx
 import filecmp
 from preferences import *
+from _datetime import datetime
 
 __author__ = "Pedro Correia de Siracusa"
 __copyright__ = "Copyright 2015, CARIAMA project"
@@ -146,13 +147,14 @@ class File:
         """ Unlinks this File instance to file in directory, setting path attribute to None """
         self.__filePath=None
          
-    def copyTo(self, destPath, bufferSize=10485760, preserveDate=True):
+    def copyTo(self, destPath, bufferSize=10485760, preserveDate=True, strict=True):
         ''' 
         Copies file from current path to destination. Checks if file already exists on destination before 
         Optimized for copying large files
         @param destPath: Destination path
         @param bufferSize: Buffer size to use during copying. Default = 10MB
         @param preserveDate: Preserves the original file date. Default = True 
+        @param strict: If false, file can be copied with a different name
         @return: instance of new file object
         '''
         # Make sure target directory exists; create it if necessary
@@ -164,7 +166,8 @@ class File:
         fList = [f for f in os.listdir(destDir) if os.path.isfile(os.path.join(destDir, f))]
         for f in fList:
             if filecmp.cmp(self.__filePath, os.path.join(destDir, f)):
-                raise FileExistsError("[mediautils.copyTo] File %r already exists on destination" %(destFName))
+                if strict or self.getName() == os.path.splitext(destFName)[0]:
+                    raise FileExistsError("[mediautils.copyTo] File %r already exists on destination" %(destFName))
            
         # Optimize buffer for small files
         bufferSize = min(bufferSize, os.path.getsize(self.__filePath))
@@ -331,53 +334,64 @@ class Directory:
         return self.__dirPath
  
 
-def importFilesToQuarantine(srcFiles, mediaType, copy=True, indexing=True, dstRootPath=MEDIA_DB_QUARANTINE_ROOT):
+def importFiles(srcFiles, dstRootPath, organizeBy=None, copy=True, indexing=True):
     """
     TODO: Test rollbacks
-    Imports untrimmed and unprocessed media files to quarantine directory
-    This function does not include media in the database
-    @param srcFiles: List of File objects to be imported
+    TODO: param srcFiles must be a unique srcFile!!
+    Imports media files to a destination, in filesystem
+    This function does not deal with metadata
+    @param srcFiles: List of File objects to be imported. Files must be of a valid media type
+    @param dstRootPath: Root of destination directory 
+    @param organizeBy: Files organizational method. Available options are defined in the preferences module. If None(default), all files are imported to root
     @param copy: If true, files are copied instead of being moved. Defaults to True
     @param indexing: If true, files are automatically indexed on importing. Defaults to True
-    @param dstRootPath: Destination root of the quarantine. Defaults to the path defined in the preferences module
-    """
-    # sets destination directory
-    try: 
-        dstDir = Directory(dstRootPath)
-    except NotADirectoryError:
-        os.makedirs(dstRootPath)
-        dstDir = Directory(dstRootPath)
-        
-    # importing routine
+    """    
     for f in srcFiles:
-        f.setMediaType(mediaType)
-        # if copy file is chosen
-        if copy:
-            try:
-                newf = f.copyTo(os.path.join(dstDir.getPath(), f.getName()+f.getExt()))
-                if indexing: 
-                    newf.setIndex()
+        try:
+            # find out the target directory for file
+            if organizeBy is not None: # use some organizational method
+                dstDir = IMPORTING_ORGANIZE_BY[organizeBy](dstRootPath,f)            
+            else: # import all files to root dir
+                dstDir = dstRootPath
+                
+            # create Directory object (and path in filesystem if it did not exist)
+            try: 
+                dstDir = Directory(dstRootPath)
+            except NotADirectoryError:
+                os.makedirs(dstRootPath)
+                dstDir = Directory(dstRootPath)
+                
+            # if copy file method is chosen
+            if copy:
+                try:
+                    newf = f.copyTo(os.path.join(dstDir.getPath(), f.getName()+f.getExt()))
+                    if indexing: 
+                        newf.setIndex()
+    
+                except indx.FileIndexingError as e:
+                    newf.delete() # rollback
+                    raise FileImportingError("Could not import file %s: %s" %(f.getPath(), e))
+                
+                except FileExistsError as e:
+                    raise FileImportingError("Could not import file %s: %s"%(f.getPath(), e))
+            
+            # if move file method is chosen                          
+            else:
+                try:
+                    oldPath = f.getPath()
+                    f.moveTo(os.path.join(dstDir.getPath(), f.getName()+f.getExt()))
+                    if indexing:
+                        f.setIndex()
+                
+                except indx.FileIndexingError as e:
+                    f.moveTo(oldPath) # rollback
+                    raise FileImportingError("Could not import file %s: %s" %(f.getPath(), e))
+                
+                except FileExistsError as e:
+                    raise FileImportingError("Could not import file %s"%(f.getPath(), e))                 
 
-            except indx.FileIndexingError as e:
-                newf.delete() # rollback
-                raise FileImportingError("Could not import file %s: %s" %(f.getPath(), e))
-            
-            except FileExistsError as e:
-                raise FileImportingError("Could not import file %s"%(f.getPath(), e))
-        # if move file is chosen                          
-        else:
-            try:
-                oldPath = f.getPath()
-                f.moveTo(os.path.join(dstDir.getPath(), f.getName()+f.getExt()))
-                if indexing:
-                    f.setIndex()
-            
-            except indx.FileIndexingError as e:
-                f.moveTo(oldPath) # rollback
-                raise FileImportingError("Could not import file %s: %s" %(f.getPath(), e))
-            
-            except FileExistsError as e:
-                raise FileImportingError("Could not import file %s"%(f.getPath(), e))                 
+        except KeyError as e:
+            raise e
 
 
 def importMedia():
@@ -395,12 +409,12 @@ def main():
         Main function
     '''
     srcDir = r'G:\videos_sentinelas'
-    srcfiles = [File(os.path.join(srcDir, f)) for f in os.listdir(srcDir) if os.path.isfile(os.path.join(srcDir, f))]
+    srcfiles = [File(os.path.join(srcDir, f), "footage") for f in os.listdir(srcDir) if os.path.isfile(os.path.join(srcDir, f))]
     for f in srcfiles:
         print(f.getPath())
         
-    importFilesToQuarantine(srcfiles, "ctraps")
-    
+
+    importFiles(srcfiles, r'G:\cariama\mediadb\quarantine', organizeBy='date%Y%m')
     
     
 
