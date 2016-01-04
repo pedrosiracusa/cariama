@@ -57,7 +57,7 @@ def numberFormatToString(number, length=4, strict=True):
     Formats number input to a n-lenghted string
     @param number: Int Number to be formatted to string
     @param length: Length of the string with leading zeroes
-    @param strict: If strict, number must fit on the string. If not strict, only trailing digits are discarded
+    @param strict: If strict, number must fit on the string. If not strict, leading digits are discarded
     """
     
     numString=str(number) 
@@ -71,7 +71,7 @@ def numberFormatToString(number, length=4, strict=True):
         if strict:
             raise ValueError("Strict mode: Number must be equal to or smaller than %s" %((10**length)-1))    
         else: 
-            return numString[:length]
+            return numString[-length:]
         
     while len(numString)<length:
         numString="0"+numString
@@ -108,14 +108,7 @@ class FileIndexingError(Exception):
     pass
     
 def main():
-    try:
-        if(True):
-            raise FileIndexingError("Hello", "World")
-        else:
-            print("Well done")
-        
-    except FileIndexingError as e:  
-        print(e.args)
+    print(numberFormatToString(123456789, 4, False))
         
 if __name__=='__main__':
     main()

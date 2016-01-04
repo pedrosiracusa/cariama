@@ -6,8 +6,10 @@ Created on Dec 20, 2015
 
 import unittest, os, shutil, filecmp
 from fdmgm import File, Directory
+import fdmgm as mgm
 import indexing as indx
 import preferences as prefs
+from wheel.signatures import assertTrue
 
 
 class TestFileMethods(unittest.TestCase):
@@ -442,8 +444,8 @@ class TestIndexing(unittest.TestCase):
         # Ouputs n-lengthed string when number length is equal parameter
         self.assertEqual(len(indx.numberFormatToString(9999, length=n, strict=False)), n)
         
-        # Assures trailing numbers get discarded when number length > length parameter
-        self.assertFalse("9" in indx.numberFormatToString(11119, length=4, strict=False))
+        # Assures leading numbers get discarded when number length > length parameter
+        self.assertFalse("9" in indx.numberFormatToString(91111, length=4, strict=False))
         
         # Raises error when number is not int
         with self.assertRaises(TypeError):
@@ -473,6 +475,47 @@ class TestIndexing(unittest.TestCase):
         with self.assertRaises(ValueError):
             indx.genIndex(invalidPrefix, self.testFile.getDate()['mtime'], self.testFile.getSize())
         
+        
+
+class TestImporting(unittest.TestCase):
+    
+    def setUp(self):
+        """ Creates test dir and files """
+        self.validMediaType = next(iter(prefs.INDEX_PREFIX.keys()))
+        os.makedirs(os.path.abspath("fixtures"))
+        # test quarantine
+        self.testQuarantine = os.path.abspath("fixtures/quarantine")
+        os.makedirs(self.testQuarantine)
+        # file1
+        fpath = os.path.abspath("fixtures/mediafile1.dat")
+        with open(fpath, 'wb') as f:
+            f.write(os.urandom(2048))
+        self.testfile1 = File(fpath)
+        # file2
+        fpath = os.path.abspath("fixtures/mediafile2.dat")
+        with open(fpath, 'wb') as f:
+            f.write(os.urandom(1024))
+        self.testfile2 = File(fpath)
+    
+    def tearDown(self):
+        """ Removes fixtures test dirs and files """
+        shutil.rmtree(os.path.abspath("fixtures"))
+    
+    def test_import_indexing_files_on_import_does_not_rename_original(self):
+        """ Importing method by copying prevents original file renaming during its routine """
+        origName = self.testfile1.getName()
+        mgm.importFilesToQuarantine([self.testfile1], 
+                                    mediaType=self.validMediaType, 
+                                    copy=True, 
+                                    indexing=True, 
+                                    dstRootPath = self.testQuarantine)
+        self.assertEqual(origName, self.testfile1.getName())
+          
+    def test_import_copying_files_rollsback_if_importing_fails(self):
+        pass
+    
+    def test_import_moving_files_rollsback_if_importing_fails(self):
+        pass
 
 def main():
     

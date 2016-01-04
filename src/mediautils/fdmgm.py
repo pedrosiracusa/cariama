@@ -14,9 +14,10 @@ Name:        Files and Directories Management Module (FDMGM)
 Package:     CARIAMA Media Archive Utilities
 """
 
-import os, shutil
+import os, stat, shutil
 import indexing as indx
 import filecmp
+from preferences import *
 
 __author__ = "Pedro Correia de Siracusa"
 __copyright__ = "Copyright 2015, CARIAMA project"
@@ -125,8 +126,7 @@ class File:
         # do not re-index file
         else:
             raise indx.FileIndexingError("Cannot set index to file %s. File is already indexed!" %(self.__filePath))
-        
-        
+             
     def setDate(self, timestamp, mode="am"):
         ''' 
         Sets file modification or access date using input timestamp
@@ -203,6 +203,19 @@ class File:
         self.__filePath=None
         
         return File(destPath, mediaType=self.__mediaType)
+          
+    def delete(self):
+        """ Deletes file object and at filesystem TODO: put a try-catch harness """
+        if not self.exists():
+            raise FileNotFoundError("Cannot delete a non-existent file")
+        try:
+            os.remove(self.__filePath)
+        except PermissionError:
+            os.chmod(self.__filePath, stat.S_IWUSR)
+            os.remove(self.__filePath)
+            
+        self.unlink()
+        return None
           
     def __str__(self):
         '''
@@ -318,11 +331,54 @@ class Directory:
         return self.__dirPath
  
 
-def toQuarantine():
-    ''' TODO: 
-    MOVE TO TOP MODULE
-    Moves untrimmed video to quarantine, before they're included in database '''
-    pass
+def importFilesToQuarantine(srcFiles, mediaType, copy=True, indexing=True, dstRootPath=MEDIA_DB_QUARANTINE_ROOT):
+    """
+    TODO: Test rollbacks
+    Imports untrimmed and unprocessed media files to quarantine directory
+    This function does not include media in the database
+    @param srcFiles: List of File objects to be imported
+    @param copy: If true, files are copied instead of being moved. Defaults to True
+    @param indexing: If true, files are automatically indexed on importing. Defaults to True
+    @param dstRootPath: Destination root of the quarantine. Defaults to the path defined in the preferences module
+    """
+    # sets destination directory
+    try: 
+        dstDir = Directory(dstRootPath)
+    except NotADirectoryError:
+        os.makedirs(dstRootPath)
+        dstDir = Directory(dstRootPath)
+        
+    # importing routine
+    for f in srcFiles:
+        f.setMediaType(mediaType)
+        # if copy file is chosen
+        if copy:
+            try:
+                newf = f.copyTo(os.path.join(dstDir.getPath(), f.getName()+f.getExt()))
+                if indexing: 
+                    newf.setIndex()
+
+            except indx.FileIndexingError as e:
+                newf.delete() # rollback
+                raise FileImportingError("Could not import file %s: %s" %(f.getPath(), e))
+            
+            except FileExistsError as e:
+                raise FileImportingError("Could not import file %s"%(f.getPath(), e))
+        # if move file is chosen                          
+        else:
+            try:
+                oldPath = f.getPath()
+                f.moveTo(os.path.join(dstDir.getPath(), f.getName()+f.getExt()))
+                if indexing:
+                    f.setIndex()
+            
+            except indx.FileIndexingError as e:
+                f.moveTo(oldPath) # rollback
+                raise FileImportingError("Could not import file %s: %s" %(f.getPath(), e))
+            
+            except FileExistsError as e:
+                raise FileImportingError("Could not import file %s"%(f.getPath(), e))                 
+
 
 def importMedia():
     ''' TODO: Moves media to database 
@@ -331,15 +387,23 @@ def importMedia():
     '''
     pass
 
+class FileImportingError(Exception):
+    pass
+
 def main():
     '''
         Main function
     '''
+    srcDir = r'G:\videos_sentinelas'
+    srcfiles = [File(os.path.join(srcDir, f)) for f in os.listdir(srcDir) if os.path.isfile(os.path.join(srcDir, f))]
+    for f in srcfiles:
+        print(f.getPath())
+        
+    importFilesToQuarantine(srcfiles, "ctraps")
     
-    myDir = Directory(r'C:\Users\PEDRO\Desktop\videos_sentinelas', 'video')
-    print(myDir.getSize())
-    print(myDir.getSize(recursive=False))
     
+    
+
 
     
     
