@@ -396,67 +396,6 @@ def importFile(srcFile, dstRootPath, organizeBy=None, copy=True, indexing=True):
     except KeyError as e:
         raise e
 
-def importFiles(srcFiles, dstRootPath, organizeBy=None, copy=True, indexing=True):
-    """
-    TODO: remove
-    TODO: Test rollbacks
-    TODO: param srcFiles must be a unique srcFile!!
-    Imports media files to a destination, in filesystem
-    This function does not deal with metadata
-    @param srcFiles: List of File objects to be imported. Files must be of a valid media type
-    @param dstRootPath: Root of destination directory 
-    @param organizeBy: Files organizational method. Available options are defined in the preferences module. If None(default), all files are imported to root
-    @param copy: If true, files are copied instead of being moved. Defaults to True
-    @param indexing: If true, files are automatically indexed on importing. Defaults to True
-    """    
-    for f in srcFiles:
-        try:
-            # find out the target directory for file
-            if organizeBy is not None: # use some organizational method
-                dstDir = IMPORTING_ORGANIZE_BY[organizeBy](dstRootPath,f)            
-            else: # import all files to root dir
-                dstDir = dstRootPath
-                
-            # create Directory object (and path in filesystem if it did not exist)
-            try: 
-                dstDir = Directory(dstRootPath)
-            except NotADirectoryError:
-                os.makedirs(dstRootPath)
-                dstDir = Directory(dstRootPath)
-                
-            # if copy file method is chosen
-            if copy:
-                try:
-                    newf = f.copyTo(os.path.join(dstDir.getPath(), f.getName()+f.getExt()))
-                    if indexing: 
-                        newf.setIndex()
-    
-                except indx.FileIndexingError as e:
-                    newf.delete() # rollback
-                    raise FileImportingError("Could not import file %s: %s" %(f.getPath(), e))
-                
-                except FileExistsError as e:
-                    raise FileImportingError("Could not import file %s: %s"%(f.getPath(), e))
-            
-            # if move file method is chosen                          
-            else:
-                try:
-                    oldPath = f.getPath()
-                    f.moveTo(os.path.join(dstDir.getPath(), f.getName()+f.getExt()))
-                    if indexing:
-                        f.setIndex()
-                
-                except indx.FileIndexingError as e:
-                    f.moveTo(oldPath) # rollback
-                    raise FileImportingError("Could not import file %s: %s" %(f.getPath(), e))
-                
-                except FileExistsError as e:
-                    raise FileImportingError("Could not import file %s"%(f.getPath(), e))                 
-
-        except KeyError as e:
-            raise e
-
-
 def importMedia():
     ''' TODO: Moves media to database 
     MOVE TO TOP MODULE

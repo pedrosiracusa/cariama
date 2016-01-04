@@ -524,14 +524,17 @@ class TestImporting(unittest.TestCase):
         """ If there is an issue with importing a file by copy, the operation rolls back """
         self.testfile1.setMediaType(self.validMediaType)
         # Error importing at indexing routine: different file already exists with the same index
-        importedFile = mgm.importFile(self.testfile1, self.testQuarantine, copy=True, indexing=True)
-        self.testfile2.setName(importedFile.getName())
+        fileIndx = indx.genIndex(indx.getPrefix(self.testfile1.getMediaType()), self.testfile1.getDate()['mtime'], self.testfile1.getSize())
+        diffFile = mgm.importFile(self.testfile2, self.testQuarantine, copy=True, indexing=False)
+        diffFile.setName(fileIndx)
         with self.assertRaises(mgm.FileImportingError):
-            mgm.importFile(self.testfile2, self.testQuarantine, copy=True, indexing=False)
-        # original file was preserved
+            mgm.importFile(self.testfile1, self.testQuarantine, copy=True, indexing=True)
+        # asserts only diffFile exists in import directory, and rollback occured
+        self.assertEqual((len(os.listdir(self.testQuarantine))),1)
 
     
     def test_import_moving_files_rollsback_if_importing_fails(self):
+        # original file was preserved
         pass
 
 def main():
