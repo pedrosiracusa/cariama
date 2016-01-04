@@ -184,12 +184,12 @@ class File:
         return File(destPath, mediaType=self.__mediaType)
            
     def moveTo(self, destPath, strict=True):
-        ''' 
+        """
         Moves file from current path to destination. Checks if file already exists on destination before
         @param destPath: Destination path
         @param strict: If false, the same file can be moved with a different name
         @return: instance of new file object
-        '''
+        """
         # Make sure target directory exists; create it if necessary
         destDir, destFName = os.path.split(destPath) 
         if not os.path.isdir(destDir):
@@ -206,9 +206,8 @@ class File:
         # Moving routine
         shutil.move(self.__filePath, destPath)
         
-        self.__filePath=None
+        self.__filePath=destPath
         
-        return File(destPath, mediaType=self.__mediaType)
           
     def delete(self):
         """ Deletes file object and at filesystem TODO: put a try-catch harness """

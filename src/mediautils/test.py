@@ -134,12 +134,11 @@ class TestFileMethods(unittest.TestCase):
         with self.assertRaises(FileExistsError):
             self.testfile.copyTo(self.tgtsubfile.getPath()) # overwrite file in another dir            
             
-    def test_move_file_returns_valid_object(self):
-        """ Method .moveTo returns a valid (existing) File object with the same medi type and content """
+    def test_move_file_does_not_return_valid_object(self):
+        """ Method .moveTo does not return a valid File object, as opposed to copyTo()"""
         self.testfile.setMediaType('somemedia')
-        newFile = self.testfile.moveTo("fixtures/move/newfile" + self.testfile.getExt())
-        self.assertTrue(newFile.exists())
-        self.assertTrue(newFile.getMediaType()=="somemedia")
+        returnVal = self.testfile.moveTo("fixtures/move/newfile" + self.testfile.getExt())
+        self.assertIsNone(returnVal)
         
     def test_move_file_discards_original_file(self):
         """ Method .moveTo removes the original file (moving routine) """  
@@ -147,11 +146,6 @@ class TestFileMethods(unittest.TestCase):
         self.testfile.moveTo("fixtures/move/newfile" + self.testfile.getExt())
         self.assertNotEqual(self.testfile.getPath(), originalPath)
         self.assertFalse(os.path.isfile(originalPath))
-          
-    def test_move_file_unlinks_original_file_path(self):
-        """ Method .moveTo updates original File instance path to None, to avoid broken link """    
-        self.testfile.moveTo("fixtures/move/newfile" + self.testfile.getExt())   
-        self.assertIsNone(self.testfile.getPath())
  
     def test_set_index_does_not_accept_invalid_media_type(self):
         """ setIndex method does not index file with invalid media type """
@@ -520,22 +514,26 @@ class TestImporting(unittest.TestCase):
                         indexing=True)
         self.assertEqual(origName, self.testfile1.getName())
           
-    def test_import_copying_files_rollsback_if_importing_fails(self):
-        """ If there is an issue with importing a file by copy, the operation rolls back """
+    def test_import_files_rollsback_if_importing_fails(self):
+        """ If there is an issue with importing a file by copy or moving, the operation rolls back """
         self.testfile1.setMediaType(self.validMediaType)
         # Error importing at indexing routine: different file already exists with the same index
         fileIndx = indx.genIndex(indx.getPrefix(self.testfile1.getMediaType()), self.testfile1.getDate()['mtime'], self.testfile1.getSize())
         diffFile = mgm.importFile(self.testfile2, self.testQuarantine, copy=True, indexing=False)
         diffFile.setName(fileIndx)
+        
+        # Failure by copying
         with self.assertRaises(mgm.FileImportingError):
             mgm.importFile(self.testfile1, self.testQuarantine, copy=True, indexing=True)
-        # asserts only diffFile exists in import directory, and rollback occured
+        # make sure only diffFile exists in import directory, and rollback occured
         self.assertEqual((len(os.listdir(self.testQuarantine))),1)
-
+        
+        # Failure by moving
+        with self.assertRaises(mgm.FileImportingError):
+            mgm.importFile(self.testfile1, self.testQuarantine, copy=False, indexing=True)
+        # make sure original file was not discarded
+        #self.assertTrue(self.testfile1)
     
-    def test_import_moving_files_rollsback_if_importing_fails(self):
-        # original file was preserved
-        pass
 
 def main():
     
