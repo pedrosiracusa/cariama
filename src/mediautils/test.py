@@ -10,23 +10,27 @@ import fdmgm as mgm
 import indexing as indx
 import preferences as prefs
 from wheel.signatures import assertTrue
+from mediautils.fdmgm import importFile
 
 
 class TestFileMethods(unittest.TestCase):
     
     def setUp(self):
-        """ Creates two different files on fixtures directory for testing """
-        os.makedirs(os.path.abspath("fixtures"))
+        """ Creates three different files on fixtures directory for testing """
+        os.makedirs(os.path.abspath("fixtures/subdir"))
         fpath = os.path.abspath("fixtures/tgtfile.dat")
         with open(fpath, 'wb') as f:
-            f.write(os.urandom(2048))
-            
+            f.write(os.urandom(2048))            
         self.tgtfile = File(fpath)
+        
+        fpath = os.path.abspath("fixtures/subdir/tgtfile2.dat")
+        with open(fpath, 'wb') as f:
+            f.write(os.urandom(4096))
+        self.tgtsubfile = File(fpath)
         
         fpath = os.path.abspath("fixtures/testfile.dat")
         with open(fpath, 'wb') as f:
-            f.write(os.urandom(1024))
-            
+            f.write(os.urandom(1024))      
         self.testfile = File(fpath)
                 
     def test_files_are_different(self):
@@ -94,7 +98,10 @@ class TestFileMethods(unittest.TestCase):
         """ Method .copyTo does not accidentally overwrite files """
         with self.assertRaises(FileExistsError):
             self.testfile.copyTo(self.tgtfile.getPath()) # overwrite another file
+        with self.assertRaises(FileExistsError):
             self.testfile.copyTo(self.testfile.getPath()) # overwrite same file
+        with self.assertRaises(FileExistsError):
+            self.testfile.copyTo(self.tgtsubfile.getPath()) # overwrite file in another dir
         
     def test_copy_file_returns_valid_object(self):
         """ Method .copyTo returns a valid (existing) File object with the same media type and content"""    
@@ -122,7 +129,10 @@ class TestFileMethods(unittest.TestCase):
         """ Method .moveTo does not accidentally overwrite files """
         with self.assertRaises(FileExistsError):
             self.testfile.moveTo(self.tgtfile.getPath()) # overwrite another file
+        with self.assertRaises(FileExistsError):
             self.testfile.moveTo(self.testfile.getPath()) # overwrite same file
+        with self.assertRaises(FileExistsError):
+            self.testfile.copyTo(self.tgtsubfile.getPath()) # overwrite file in another dir            
             
     def test_move_file_returns_valid_object(self):
         """ Method .moveTo returns a valid (existing) File object with the same medi type and content """
@@ -474,8 +484,7 @@ class TestIndexing(unittest.TestCase):
         invalidPrefix = "MVTC"
         with self.assertRaises(ValueError):
             indx.genIndex(invalidPrefix, self.testFile.getDate()['mtime'], self.testFile.getSize())
-        
-        
+          
 
 class TestImporting(unittest.TestCase):
     
@@ -501,11 +510,11 @@ class TestImporting(unittest.TestCase):
         """ Removes fixtures test dirs and files """
         shutil.rmtree(os.path.abspath("fixtures"))
     
-    def test_import_indexing_files_copied_on_import_does_not_rename_original(self):
+    def test_import_file_indexing_file_copied_on_import_does_not_rename_original(self):
         """ Importing method by copying prevents original file renaming during its routine """
         origName = self.testfile1.getName()
         self.testfile1.setMediaType(self.validMediaType)
-        mgm.importFiles([self.testfile1], 
+        mgm.importFile(self.testfile1, 
                         dstRootPath=self.testQuarantine,
                         copy=True,
                         indexing=True)
@@ -514,18 +523,13 @@ class TestImporting(unittest.TestCase):
     def test_import_copying_files_rollsback_if_importing_fails(self):
         """ If there is an issue with importing a file by copy, the operation rolls back """
         self.testfile1.setMediaType(self.validMediaType)
-        testfile3 = self.testfile1.copyTo(os.path.abspath("fixtures/mediafile3.dat"), preserveDate=True, strict=False)
-        # Error importing: file already exists
+        # Error importing at indexing routine: different file already exists with the same index
+        importedFile = mgm.importFile(self.testfile1, self.testQuarantine, copy=True, indexing=True)
+        self.testfile2.setName(importedFile.getName())
         with self.assertRaises(mgm.FileImportingError):
-            mgm.importFiles([self.testfile1, testfile3],
-                            dstRootPath=self.testQuarantine, 
-                            copy=True, 
-                            indexing=True)
-        # Error importing: file already exists with the same index
-        self.testfile1.setIndex()
+            mgm.importFile(self.testfile2, self.testQuarantine, copy=True, indexing=False)
         # original file was preserved
-        print(testfile3.getPath())
-        print(self.testfile1.getPath())
+
     
     def test_import_moving_files_rollsback_if_importing_fails(self):
         pass
