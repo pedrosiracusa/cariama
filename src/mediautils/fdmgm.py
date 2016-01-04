@@ -17,8 +17,7 @@ Package:     CARIAMA Media Archive Utilities
 import os, stat, shutil
 import indexing as indx
 import filecmp
-from preferences import *
-from _datetime import datetime
+from preferences import IMPORTING_ORGANIZE_BY
 
 __author__ = "Pedro Correia de Siracusa"
 __copyright__ = "Copyright 2015, CARIAMA project"
@@ -154,7 +153,7 @@ class File:
         @param destPath: Destination path
         @param bufferSize: Buffer size to use during copying. Default = 10MB
         @param preserveDate: Preserves the original file date. Default = True 
-        @param strict: If false, file can be copied with a different name
+        @param strict: If false, the same file can be copied with a different name
         @return: instance of new file object
         '''
         # Make sure target directory exists; create it if necessary
@@ -165,10 +164,11 @@ class File:
         # Check if destination file already exists in directory; Abort copying if positive
         fList = [f for f in os.listdir(destDir) if os.path.isfile(os.path.join(destDir, f))]
         for f in fList:
-            if filecmp.cmp(self.__filePath, os.path.join(destDir, f)):
-                if strict or self.getName() == os.path.splitext(destFName)[0]:
+            # first line check if files contents are the same (regardless of path) and second checks if file path already exists
+            if  (filecmp.cmp(self.__filePath, os.path.join(destDir, f)) and strict) or \
+                (destPath==os.path.join(destDir, f)):
                     raise FileExistsError("[mediautils.copyTo] File %r already exists on destination" %(destFName))
-           
+                
         # Optimize buffer for small files
         bufferSize = min(bufferSize, os.path.getsize(self.__filePath))
         if bufferSize==0:
@@ -183,10 +183,11 @@ class File:
             
         return File(destPath, mediaType=self.__mediaType)
            
-    def moveTo(self, destPath):
+    def moveTo(self, destPath, strict=True):
         ''' 
         Moves file from current path to destination. Checks if file already exists on destination before
         @param destPath: Destination path
+        @param strict: If false, the same file can be moved with a different name
         @return: instance of new file object
         '''
         # Make sure target directory exists; create it if necessary
@@ -194,11 +195,13 @@ class File:
         if not os.path.isdir(destDir):
             os.makedirs(destDir)
         
-        # Check if destination file already exists in directory; Abort copying if positive
+        # Check if destination file already exists in directory; Abort moving if positive
         fList = [f for f in os.listdir(destDir) if os.path.isfile(os.path.join(destDir, f))]
         for f in fList:
-            if filecmp.cmp(self.__filePath, os.path.join(destDir, f)):
-                raise FileExistsError("[mediautils.copyTo] File %r already exists on destination" %(destFName))
+            # first line check if files contents are the same (regardless of path) and second checks if file path already exists
+            if  (filecmp.cmp(self.__filePath, os.path.join(destDir, f)) and strict) or \
+                (destPath==os.path.join(destDir, f)):                
+                    raise FileExistsError("[mediautils.copyTo] File %r already exists on destination" %(destFName))
   
         # Moving routine
         shutil.move(self.__filePath, destPath)
@@ -334,8 +337,68 @@ class Directory:
         return self.__dirPath
  
 
+def importFile(srcFile, dstRootPath, organizeBy=None, copy=True, indexing=True):
+    """
+    Imports media file to destination, in filesystem
+    This function does not deal with files metadata
+    @param srcFile: File object to be imported. File must be of a valid media type
+    @param dstRootPath: Root of destination directory 
+    @param organizeBy: Files organizational method. Available options are defined in the preferences module. If None(default), all files are imported to root
+    @param copy: If true, files are copied instead of being moved. Defaults to True
+    @param indexing: If true, files are automatically indexed on importing. Defaults to True  
+    @return: Reference to imported file  
+    """ 
+    try:
+        # find out the target directory for file
+        if organizeBy is not None: # use some organizational method
+            dstDir = IMPORTING_ORGANIZE_BY[organizeBy](dstRootPath,srcFile)            
+        else: # import all files to root dir
+            dstDir = dstRootPath
+            
+        # create Directory object (and path in filesystem if it did not exist)
+        try: 
+            dstDir = Directory(dstRootPath)
+        except NotADirectoryError:
+            os.makedirs(dstRootPath)
+            dstDir = Directory(dstRootPath)
+            
+        # if copy file method is chosen
+        if copy:
+            try:
+                newf = srcFile.copyTo(os.path.join(dstDir.getPath(), srcFile.getName()+srcFile.getExt()))
+                if indexing: 
+                    newf.setIndex()
+                return newf
+
+            except indx.FileIndexingError as e:
+                newf.delete() # rollback
+                raise FileImportingError("Could not import file %s: %s" %(srcFile.getPath(), e))
+            
+            except FileExistsError as e:
+                raise FileImportingError("Could not import file %s: %s"%(srcFile.getPath(), e))
+        
+        # if move file method is chosen                          
+        else:
+            try:
+                oldPath = srcFile.getPath()
+                srcFile.moveTo(os.path.join(dstDir.getPath(), srcFile.getName()+srcFile.getExt()))
+                if indexing:
+                    srcFile.setIndex()
+                return srcFile
+            
+            except indx.FileIndexingError as e:
+                srcFile.moveTo(oldPath) # rollback
+                raise FileImportingError("Could not import file %s: %s" %(srcFile.getPath(), e))
+            
+            except FileExistsError as e:
+                raise FileImportingError("Could not import file %s"%(srcFile.getPath(), e))                 
+
+    except KeyError as e:
+        raise e
+
 def importFiles(srcFiles, dstRootPath, organizeBy=None, copy=True, indexing=True):
     """
+    TODO: remove
     TODO: Test rollbacks
     TODO: param srcFiles must be a unique srcFile!!
     Imports media files to a destination, in filesystem
@@ -411,10 +474,10 @@ def main():
     srcDir = r'G:\videos_sentinelas'
     srcfiles = [File(os.path.join(srcDir, f), "footage") for f in os.listdir(srcDir) if os.path.isfile(os.path.join(srcDir, f))]
     for f in srcfiles:
-        print(f.getPath())
+        pass
         
-
-    importFiles(srcfiles, r'G:\cariama\mediadb\quarantine', organizeBy='date%Y%m')
+    srcFile = srcfiles[0]
+    importFile(srcFile, r'G:\cariama\mediadb\quarantine', organizeBy='date%Y%m')
     
     
 
