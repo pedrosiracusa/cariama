@@ -2,7 +2,6 @@
 """
 This module gathers functions for generating and parsing indexes
 of the media file objects, from the FDMGM module
-Some functions operate by changing FDMGM objects properties TODO:REMOVE
 This module operates based on the package's preferences
 
 Name:        CARIAMA Indexing System Module
@@ -80,16 +79,17 @@ def numberFormatToString(number, length=4, strict=True):
 
 
 
-def parseIndex(index, suffLen=INDEX_SUFFIX_LENGTH):
+def parseIndex(index, parseExp = INDEX_PARSING_EXPRESSION):
     """
     Uses regular expressions to validate the input file's index
+    This function does not raise any exceptions
+    @param index: Index string to be parsed
+    @param parseExp: Regular expression to be matched
     @return: True if input index is valid
     @return: False if input index is not valid
     """
-    dateLen = len( time.strftime(INDEX_DATETIME_FORMAT, time.localtime(time.clock())) )
-
     try:
-        pIdx = re.match('(?P<pref>[a-z]+)(?P<date>\d{'+str(dateLen)+'})(?P<suff>\d{'+str(suffLen)+'}$)', index, IGNORECASE).groupdict()
+        pIdx = re.match(parseExp, index).groupdict()
         assert(pIdx['pref'] in INDEX_PREFIX.values())
         idxDate=time.strptime(pIdx['date'], INDEX_DATETIME_FORMAT)
 
@@ -103,12 +103,28 @@ def parseIndex(index, suffLen=INDEX_SUFFIX_LENGTH):
         
     except Exception: return False
     
-    
+def indexToDate(indx):
+    """
+    Parses index datestring to timestamp 
+    @param indx: Index to which date must be parsed and extracted
+    @return: Timestamp from parsed date
+    @raise ImportParsingError: if input index does not parse
+    """
+    parsedIndx = parseIndex(indx)
+    if parsedIndx:
+        return time.mktime(time.strptime(parsedIndx['datestring'], INDEX_DATETIME_FORMAT))
+    else:
+        raise IndexParsingError("Could not parse input index: \'%s\'"%indx)
+        
+
 class FileIndexingError(Exception):
+    pass
+
+class IndexParsingError(Exception):
     pass
     
 def main():
-    print(numberFormatToString(123456789, 4, False))
+    pass
         
 if __name__=='__main__':
     main()

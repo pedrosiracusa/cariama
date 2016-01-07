@@ -9,8 +9,6 @@ from fdmgm import File, Directory
 import fdmgm as mgm
 import indexing as indx
 import preferences as prefs
-from wheel.signatures import assertTrue
-from mediautils.fdmgm import importFile
 
 
 class TestFileMethods(unittest.TestCase):
@@ -532,7 +530,7 @@ class TestImporting(unittest.TestCase):
         with self.assertRaises(mgm.FileImportingError):
             mgm.importFile(self.testfile1, self.testQuarantine, copy=False, indexing=True)
         # make sure original file was not discarded
-        #self.assertTrue(self.testfile1)
+        self.assertTrue(self.testfile1)
     
 
 def main():

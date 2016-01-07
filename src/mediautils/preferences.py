@@ -2,10 +2,11 @@
 Preferences to use in mediautils package
 """
 
-import os
+import os, time
 from datetime import datetime
 
-""" Indexing preferences """
+
+""" Indexing System Preferences """
 # Prefixes for each media type
 INDEX_PREFIX = {
                 'footage':"MVDC",
@@ -15,6 +16,8 @@ INDEX_PREFIX = {
 
 INDEX_SUFFIX_LENGTH = 5;
 INDEX_DATETIME_FORMAT = '%Y%m%d%H%M%S'
+INDEX_DATETIME_LENGTH = len( time.strftime(INDEX_DATETIME_FORMAT, time.localtime(time.clock())) )
+INDEX_PARSING_EXPRESSION = '(?P<pref>[A-Za-z]+)(?P<date>\d{'+str(INDEX_DATETIME_LENGTH)+'})(?P<suff>\d{'+str(INDEX_SUFFIX_LENGTH)+'}$)'
 
 
 """ Files Storage and importing preferences """

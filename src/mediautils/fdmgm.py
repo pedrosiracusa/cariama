@@ -207,8 +207,7 @@ class File:
         shutil.move(self.__filePath, destPath)
         
         self.__filePath=destPath
-        
-          
+                  
     def delete(self):
         """ Deletes file object and at filesystem TODO: put a try-catch harness """
         if not self.exists():
@@ -346,6 +345,7 @@ def importFile(srcFile, dstRootPath, organizeBy=None, copy=True, indexing=True):
     @param copy: If true, files are copied instead of being moved. Defaults to True
     @param indexing: If true, files are automatically indexed on importing. Defaults to True  
     @return: Reference to imported file  
+    @raise FileImportingError: if importing fails 
     """ 
     try:
         # find out the target directory for file
@@ -394,13 +394,6 @@ def importFile(srcFile, dstRootPath, organizeBy=None, copy=True, indexing=True):
 
     except KeyError as e:
         raise e
-
-def importMedia():
-    ''' TODO: Moves media to database 
-    MOVE TO TOP MODULE
-    @param copy: Defines whether media should be moved to directory before it is imported
-    '''
-    pass
 
 class FileImportingError(Exception):
     pass
