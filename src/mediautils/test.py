@@ -473,9 +473,17 @@ class TestIndexing(unittest.TestCase):
             
     def test_index_generator_raises_exception_if_invalid(self):
         """ Function genIndex() raises value exception if generated index is invalid """
+        # test for invalid prefix
         invalidPrefix = "MVTC"
+        validPrefix = "MVDC"
         with self.assertRaises(ValueError):
             indx.genIndex(invalidPrefix, self.testFile.getDate()['mtime'], self.testFile.getSize())
+        # test for invalid timestamp 
+        with self.assertRaises(ValueError):
+            indx.genIndex(validPrefix, -2, self.testFile.getSize())
+        # test for invalid suffix
+        with self.assertRaises(ValueError):
+            indx.genIndex(validPrefix, self.testFile.getDate()['mtime'], -2)
           
 
 class TestImporting(unittest.TestCase):
@@ -532,6 +540,12 @@ class TestImporting(unittest.TestCase):
         # make sure original file was not discarded
         self.assertTrue(self.testfile1)
     
+        
+    def test_import_files_rollsback_on_keyboard_interrypt_or_system_failure(self):
+        """ 
+        TODO
+        """
+        pass
 
 def main():
     

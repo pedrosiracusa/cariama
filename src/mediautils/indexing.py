@@ -9,9 +9,7 @@ Package:     CARIAMA Media Archive Utilities
 """
 import re, time
 from datetime import datetime
-from preferences import *
-from re import IGNORECASE
-from mediautils.preferences import INDEX_DATETIME_FORMAT, INDEX_PREFIX
+from preferences import INDEX_SUFFIX_LENGTH, INDEX_PARSING_EXPRESSION, INDEX_DATETIME_FORMAT, INDEX_PREFIX
 
 __author__ = "Pedro Correia de Siracusa"
 __copyright__ = "Copyright 2015, CARIAMA project"
@@ -25,7 +23,12 @@ __status__ = "Development"
 
 
 def getPrefix(mediaType):
-    ''' Gets prefix for media type based on the preferences module '''
+    """ 
+    Gets prefix for media type based on the preferences module
+    @param mediaType: media type to prefix
+    @return: prefix corresponding to media type
+    @raise ValueError: if input media type is invalid 
+    """
     try:
         return INDEX_PREFIX[mediaType]
     
@@ -34,23 +37,26 @@ def getPrefix(mediaType):
 
 def genIndex(prefix, timestamp, suffixNum):
     ''' 
+    @TODO: test if timestamp and prefix are not valid
     Generates index based on:
     @param prefix: String prefix to use
     @param timestamp: Datetime in timestamp format
     @param suffixNum: Numeric suffix
-    '''               
-    indx = prefix + \
-            datetime.fromtimestamp(timestamp).strftime(INDEX_DATETIME_FORMAT) + \
-            numberFormatToString(suffixNum, length=INDEX_SUFFIX_LENGTH, strict=False)
-            
-    if not parseIndex(indx):
-        raise ValueError("Could not parse generated index")
+    @return: index string
+    @raise ValuError: if generated index was not valid
+    '''   
+    try:            
+        indx = prefix + \
+                datetime.fromtimestamp(timestamp).strftime(INDEX_DATETIME_FORMAT) + \
+                numberFormatToString(suffixNum, length=INDEX_SUFFIX_LENGTH, strict=False)
+        assert(parseIndex(indx))
+         
+    except (AssertionError, ValueError, OSError):
+        raise ValueError("Could not parse generated index")  
+         
     
     return indx
     
-
-        
-
 def numberFormatToString(number, length=4, strict=True):
     """ 
     Formats number input to a n-lenghted string
@@ -76,8 +82,6 @@ def numberFormatToString(number, length=4, strict=True):
         numString="0"+numString
         
     return numString
-
-
 
 def parseIndex(index, parseExp = INDEX_PARSING_EXPRESSION):
     """
@@ -107,7 +111,7 @@ def indexToDate(indx):
     """
     Parses index datestring to timestamp 
     @param indx: Index to which date must be parsed and extracted
-    @return: Timestamp from parsed date
+    @return: Timestamp obtained from parsed date
     @raise ImportParsingError: if input index does not parse
     """
     parsedIndx = parseIndex(indx)
@@ -116,15 +120,37 @@ def indexToDate(indx):
     else:
         raise IndexParsingError("Could not parse input index: \'%s\'"%indx)
         
-
 class FileIndexingError(Exception):
-    pass
+    """ 
+        Accepts 3 positional arguments: ([strerror, filename [,index]]) 
+    """
+    def __init__(self, *args):
+        self.strerror=None,
+        self.filename=None,
+        self.index = None
+        try:
+            self.strerror = args[0]
+            self.filename = args[1]
+            self.index = args[2]
+        except IndexError:
+            pass
+        
+    def __str__(self):
+        msgstr = "%s: %s"%(self.strerror, self.filename)
+        if self.index is not None:
+            msgstr+="; index attempted: %s"%self.index
+        return (msgstr)
+
 
 class IndexParsingError(Exception):
     pass
     
 def main():
-    pass
+    try:
+        raise(FileIndexingError("Could not import", "filename","index"))
+    except FileIndexingError as e:
+        print(e)
+
         
 if __name__=='__main__':
     main()
