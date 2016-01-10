@@ -167,7 +167,7 @@ class File:
             # first line check if files contents are the same (regardless of path) and second checks if file path already exists
             if  (filecmp.cmp(self.__filePath, os.path.join(destDir, f)) and strict) or \
                 (destPath==os.path.join(destDir, f)):
-                    raise FileExistsError(errno.EEXIST,"File already exists", destPath)
+                    raise FileExistsError(errno.EEXIST,"File already exists", os.path.join(destDir, f))
                 
         # Optimize buffer for small files
         bufferSize = min(bufferSize, os.path.getsize(self.__filePath))
@@ -201,7 +201,7 @@ class File:
             # first line check if files contents are the same (regardless of path) and second checks if file path already exists
             if  (filecmp.cmp(self.__filePath, os.path.join(destDir, f)) and strict) or \
                 (destPath==os.path.join(destDir, f)):                
-                    raise FileExistsError(errno.EEXIST,"File already exists", destPath)
+                    raise FileExistsError(errno.EEXIST,"File already exists", os.path.join(destDir, f))
   
         # Moving routine
         shutil.move(self.__filePath, destPath)
@@ -355,11 +355,17 @@ def importFile(srcFile, dstRootPath, organizeBy=None, copy=True, indexing=False)
             dstDir = dstRootPath
             
         # create Directory object (and path in filesystem if it did not exist)
-        try: 
-            dstDir = Directory(dstRootPath)
-        except NotADirectoryError:
-            os.makedirs(dstRootPath)
-            dstDir = Directory(dstRootPath)
+        while True:
+            try: 
+                dstDir = Directory(dstDir)
+            except NotADirectoryError:
+                try:
+                    os.makedirs(dstDir) 
+                except FileNotFoundError:
+                    raise OSError(errno.EINVAL, "Could not create directory", dstRootPath)
+          
+                continue
+            break
             
         # if copy file method is chosen
         if copy:

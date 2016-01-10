@@ -25,8 +25,9 @@ INDEX_PARSING_EXPRESSION = '(?P<pref>[A-Za-z]+)(?P<date>\d{'+str(INDEX_DATETIME_
 MEDIA_DB_ROOT = r'G:\cariama\mediadb' # abs path to media root directory
 MEDIA_DB_QUARANTINE_ROOT = os.path.join(MEDIA_DB_ROOT, r'quarantine') # path to quarantine root directory
 IMPORTING_ORGANIZE_BY = { # available organizational methods
-                         'date%Y%m': lambda dstRootPath,f:os.path.join(                                               
+                         'PREFIX/date%Y%m': lambda dstRootPath,f:os.path.join(                                               
                                         dstRootPath,
+                                        INDEX_PREFIX[f.getMediaType()],
                                         datetime.fromtimestamp(f.getDate()['mtime']).strftime('%Y'),
                                         datetime.fromtimestamp(f.getDate()['mtime']).strftime('%m')                           
                                         ),
