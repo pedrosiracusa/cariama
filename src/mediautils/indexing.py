@@ -12,6 +12,7 @@ Next: Implement index parser class
 import re, time
 from datetime import datetime
 from preferences import INDEX_SUFFIX_LENGTH, INDEX_PARSING_EXPRESSION, INDEX_DATETIME_FORMAT, INDEX_PREFIX
+from parser import ParserError
 
 __author__ = "Pedro Correia de Siracusa"
 __copyright__ = "Copyright 2015, CARIAMA project"
@@ -51,10 +52,11 @@ def genIndex(prefix, timestamp, suffixNum):
         indx = prefix + \
                 datetime.fromtimestamp(timestamp).strftime(INDEX_DATETIME_FORMAT) + \
                 numberFormatToString(suffixNum, length=INDEX_SUFFIX_LENGTH, strict=False)
-        assert(parseIndex(indx))
+        parseIndex(indx)
          
+    
     except (AssertionError, ValueError, OSError):
-        raise ValueError("Could not parse generated index")  
+        raise ParserError(1000)  
          
     
     return indx
@@ -96,8 +98,13 @@ def parseIndex(index, parseExp = INDEX_PARSING_EXPRESSION):
     """
     try:
         pIdx = re.match(parseExp, index).groupdict()
-        assert(pIdx['pref'] in INDEX_PREFIX.values())
-        idxDate=time.strptime(pIdx['date'], INDEX_DATETIME_FORMAT)
+        if not pIdx['pref'] in INDEX_PREFIX.values():
+            raise ParserError(1)
+        
+        try:
+            idxDate=time.strptime(pIdx['date'], INDEX_DATETIME_FORMAT)
+        except ValueError:
+            raise ParserError(2, "Invalid datestring: %s"%pIdx['date'])
 
         return{
                 'pref': pIdx['pref'], 
@@ -107,7 +114,10 @@ def parseIndex(index, parseExp = INDEX_PARSING_EXPRESSION):
                 'mediatype' : [key for key, value in INDEX_PREFIX.items() if value==pIdx['pref']],         
                }
         
-    except Exception: return False
+    except AttributeError:
+        raise ParserError(0)
+    
+            
         
 class FileIndexingError(Exception):
     """ 
@@ -131,14 +141,29 @@ class FileIndexingError(Exception):
         return (msgstr)
 
 
-class IndexParsingError(Exception):
-    pass
+class ParserError(Exception):
+    err = {
+           0: ("EMTCH", "RegEx Match Error"), # String did not match expression"
+           1: ("EPREM", "Prefix Error"), # Prefix does not correspond to any valid media type"
+           2: ("EDATE", "Datestring Error"), # Invalid date
+           1000:("EUNKN", "Unknown Error")
+           }
+    
+    def __init__(self, code, msg=None, *args, **kwargs):
+        self.code=code
+        self.msg=msg
+        
+    def __str__(self):
+        
+        if self.msg==None:
+            return "[err%s] %s"%(self.err[self.code][0], self.err[self.code][1])
+        else:
+            return "[err%s] %s"%(self.err[self.code][0], self.msg)
+    
     
 def main():
-    try:
-        raise(FileIndexingError("Could not import", "filename","index"))
-    except FileIndexingError as e:
-        print(e)
+    index = "MDC2014130412131401234"
+    print(parseIndex(index, INDEX_PARSING_EXPRESSION))
 
         
 if __name__=='__main__':

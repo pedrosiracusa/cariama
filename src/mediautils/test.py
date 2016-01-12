@@ -469,20 +469,21 @@ class TestIndexing(unittest.TestCase):
         """ Test index parser with some dummy valid and invalid indexes """
         self.assertTrue(self.validIndex)
         for key, val in self.invalidIndex.items():
-            self.assertFalse(indx.parseIndex(val))
+            with self.assertRaises(indx.ParserError):
+                indx.parseIndex(val)
             
     def test_index_generator_raises_exception_if_invalid(self):
         """ Function genIndex() raises value exception if generated index is invalid """
         # test for invalid prefix
         invalidPrefix = "MVTC"
         validPrefix = "MVDC"
-        with self.assertRaises(ValueError):
+        with self.assertRaises(indx.ParserError):
             indx.genIndex(invalidPrefix, self.testFile.getDatetime()['mtime'], self.testFile.getSize())
         # test for invalid timestamp 
-        with self.assertRaises(ValueError):
+        with self.assertRaises(indx.ParserError):
             indx.genIndex(validPrefix, -2, self.testFile.getSize())
         # test for invalid suffix
-        with self.assertRaises(ValueError):
+        with self.assertRaises(indx.ParserError):
             indx.genIndex(validPrefix, self.testFile.getDatetime()['mtime'], -2)
           
 

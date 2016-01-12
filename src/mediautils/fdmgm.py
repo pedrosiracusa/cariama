@@ -85,7 +85,7 @@ class File:
             indxToParse = self.getName()
             parsedIndx = indx.parseIndex(indxToParse)
             if not parsedIndx: # in case file is not indexed yet
-                return indx.IndexParsingError("Index parsing failed: \'%s\'"%indxToParse)
+                raise indx.ParserError("Index parsing failed: \'%s\'"%indxToParse)
         
             else: # index parsed successfully
                 return time.mktime(time.strptime(parsedIndx['datestring'], INDEX_DATETIME_FORMAT))
@@ -126,7 +126,11 @@ class File:
     def setIndex(self):
         """ Sets file index based on indexing rules module """
         # only set index if file is not already indexed
-        if not indx.parseIndex(self.getName()):
+        try: # check if name is a valid index (do not re-index the file)
+            indx.parseIndex(self.getName())
+            raise indx.FileIndexingError("Could not set index to file (file is already indexed)",self.__filePath, self.getName())
+        
+        except indx.ParserError: # if file was not already indexed, do it
             try:
                 indxPref = indx.getPrefix(self.__mediaType)
                 indxDate = self.getDatetime()['mtime']
@@ -139,10 +143,7 @@ class File:
             
             except FileExistsError as e:
                 raise indx.FileIndexingError("Could not set index to file (same index already exists)", self.__filePath, index)
-        # do not re-index file
-        else:
-            raise indx.FileIndexingError("Could not set index to file (file is already indexed)",self.__filePath, self.getName())
-             
+                    
     def setDatetime(self, timestamp=None, mode="am", fromIndex=False):
         ''' 
         TODO: fix typeerror raising: use traceback
