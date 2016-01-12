@@ -6,6 +6,8 @@ This module operates based on the package's preferences
 
 Name:        CARIAMA Indexing System Module
 Package:     CARIAMA Media Archive Utilities
+
+Next: Implement index parser class
 """
 import re, time
 from datetime import datetime
@@ -106,19 +108,6 @@ def parseIndex(index, parseExp = INDEX_PARSING_EXPRESSION):
                }
         
     except Exception: return False
-    
-def indexToDate(indx):
-    """
-    Parses index datestring to timestamp 
-    @param indx: Index to which date must be parsed and extracted
-    @return: Timestamp obtained from parsed date
-    @raise ImportParsingError: if input index does not parse
-    """
-    parsedIndx = parseIndex(indx)
-    if parsedIndx:
-        return time.mktime(time.strptime(parsedIndx['datestring'], INDEX_DATETIME_FORMAT))
-    else:
-        raise IndexParsingError("Could not parse input index: \'%s\'"%indx)
         
 class FileIndexingError(Exception):
     """ 

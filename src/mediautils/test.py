@@ -118,10 +118,10 @@ class TestFileMethods(unittest.TestCase):
     
     def test_copy_file_preserves_date(self):
         """ Method .copyTo preserves file modification and access date """
-        originalTs = self.testfile.getDate()
+        originalTs = self.testfile.getDatetime()
         newFile = self.testfile.copyTo("fixtures/copy/newfile"+self.testfile.getExt(), preserveDate=True)
-        self.assertEqual(originalTs['mtime'], newFile.getDate()['mtime'])
-        self.assertEqual(originalTs['atime'], newFile.getDate()['atime'])
+        self.assertEqual(originalTs['mtime'], newFile.getDatetime()['mtime'])
+        self.assertEqual(originalTs['atime'], newFile.getDatetime()['atime'])
     
     def test_move_file_does_not_overwrite(self):
         """ Method .moveTo does not accidentally overwrite files """
@@ -477,13 +477,13 @@ class TestIndexing(unittest.TestCase):
         invalidPrefix = "MVTC"
         validPrefix = "MVDC"
         with self.assertRaises(ValueError):
-            indx.genIndex(invalidPrefix, self.testFile.getDate()['mtime'], self.testFile.getSize())
+            indx.genIndex(invalidPrefix, self.testFile.getDatetime()['mtime'], self.testFile.getSize())
         # test for invalid timestamp 
         with self.assertRaises(ValueError):
             indx.genIndex(validPrefix, -2, self.testFile.getSize())
         # test for invalid suffix
         with self.assertRaises(ValueError):
-            indx.genIndex(validPrefix, self.testFile.getDate()['mtime'], -2)
+            indx.genIndex(validPrefix, self.testFile.getDatetime()['mtime'], -2)
           
 
 class TestImporting(unittest.TestCase):
@@ -524,7 +524,7 @@ class TestImporting(unittest.TestCase):
         """ If there is an issue with importing a file by copy or moving, the operation rolls back """
         self.testfile1.setMediaType(self.validMediaType)
         # Error importing at indexing routine: different file already exists with the same index
-        fileIndx = indx.genIndex(indx.getPrefix(self.testfile1.getMediaType()), self.testfile1.getDate()['mtime'], self.testfile1.getSize())
+        fileIndx = indx.genIndex(indx.getPrefix(self.testfile1.getMediaType()), self.testfile1.getDatetime()['mtime'], self.testfile1.getSize())
         diffFile = mgm.importFile(self.testfile2, self.testQuarantine, copy=True, indexing=False)
         diffFile.setName(fileIndx)
         
