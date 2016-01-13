@@ -12,6 +12,9 @@ import preferences as prefs
 
 
 class TestFileMethods(unittest.TestCase):
+    validType = next(iter(prefs.INDEX_PREFIX.keys())) # simple file valid type
+    timestamps = [12423523.0, 252353423.0, 48534934.0] # some valid timestamps
+    validIndex = indx.genIndex(prefs.INDEX_PREFIX[validType], timestamps[0], 123)
     
     def setUp(self):
         """ Creates three different files on fixtures directory for testing """
@@ -72,6 +75,24 @@ class TestFileMethods(unittest.TestCase):
     def test_file_cannot_get_size_from_invalid_file(self):
         #TODO
         pass
+    
+    def test_get_datetime_from_file(self):
+        """ Method getDatetime() returns a dict with file's creation, modification and access dates timestamps """
+        timedict = self.testfile.getDatetime()
+        self.assertIsInstance(timedict, dict)
+        
+        for key in ['ctime', 'mtime', 'atime']:
+            self.assertIn(key, timedict.keys())
+    
+    def test_get_datetime_from_files_index(self):
+        """ Method getDatetime() parses file index and returns a timestamp """
+        self.testfile.setMediaType(self.validType)
+        self.testfile.setDatetime(self.timestamps[0])
+        self.testfile.setIndex()
+        self.testfile.setDatetime(self.timestamps[1])
+        self.assertNotEqual( self.testfile.getDatetime(fromIndex=True),
+                             self.testfile.getDatetime()
+                            )
     
     def test_rename_file_does_not_overwrite(self):
         """ Method .setName does not accidentally overwrite files """
@@ -164,12 +185,25 @@ class TestFileMethods(unittest.TestCase):
     def test_set_index_does_not_rename_indexed_file(self): 
         """ setIndex method does not re-index previously indexed files """
         # first indexing
-        validType = next(iter(prefs.INDEX_PREFIX.keys()))
-        self.testfile.setMediaType(validType)
+        self.testfile.setMediaType(self.validType)
         self.testfile.setIndex()
         # re-indexing raises error
         with self.assertRaises(indx.FileIndexingError):
             self.testfile.setIndex()      
+    
+    def test_set_datetime_from_timestamp(self):
+        """ setDatetime method updates file datetime """
+        t0 = self.testfile.getDatetime()
+        self.testfile.setDatetime(self.timestamps[0])
+        self.assertNotEqual(t0, self.testfile.getDatetime())
+    
+    def test_set_datetime_from_index(self):
+        """ Method setDatetime may be passed fromIndex argument without timestamp """
+        t0 = self.testfile.getDatetime()
+        self.testfile.setDatetime(fromIndex=self.validIndex)
+        t1 = self.testfile.getDatetime()
+        self.assertNotEqual(t0, t1)
+        
              
     def tearDown(self):
         shutil.rmtree(os.path.abspath("fixtures"))

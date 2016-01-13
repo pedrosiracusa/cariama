@@ -7,7 +7,7 @@ This module operates based on the package's preferences
 Name:        CARIAMA Indexing System Module
 Package:     CARIAMA Media Archive Utilities
 
-Next: Implement index parser class
+Next: Implement index parser class?
 """
 import re, time
 from datetime import datetime
@@ -147,7 +147,7 @@ class ParserError(Exception):
            1: ("EPREM", "Prefix Error"), # Prefix does not correspond to any valid media type"
            2: ("EDATE", "Datestring Error"), # Invalid date
            1000:("EUNKN", "Unknown Error")
-           }
+           }    
     
     def __init__(self, code, msg=None, *args, **kwargs):
         self.code=code

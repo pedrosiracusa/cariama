@@ -71,10 +71,9 @@ class File:
     
     def getDatetime(self, fromIndex=False):
         ''' 
-        TODO: Test
         Returns a dict with creation, modification and access dates (timestamps)
         @param fromIndex: If True, timestamp is returned from file's index parsing 
-                          Default:False
+                          if False, timestamp is returned from file's metadata (Default)
         '''
         if not fromIndex:
             return ({'mtime':os.path.getmtime(self.__filePath),
@@ -163,8 +162,6 @@ class File:
 
         elif timestamp is None:
             raise TypeError( "setDatetime() missing required argument: timestamp")
-        
-        return datetime.datetime.fromtimestamp(timestamp).strftime('%Y/%m/%d %H:%M:%S') #REMOVE
             
         # Setting datetime routine
         if mode=='a':
