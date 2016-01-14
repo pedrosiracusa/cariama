@@ -191,11 +191,38 @@ class TestFileMethods(unittest.TestCase):
         with self.assertRaises(indx.FileIndexingError):
             self.testfile.setIndex()      
     
+    def test_set_index_renames_indexed_file_if_forced(self):
+        """ setIndex method may re-index previously indexed file if force is set to true """
+        # first indexing
+        self.testfile.setMediaType(self.validType)
+        self.testfile.setIndex()
+        # re-indexing with forcing
+        self.testfile.setIndex(force=True)
+    
     def test_set_datetime_from_timestamp(self):
         """ setDatetime method updates file datetime """
         t0 = self.testfile.getDatetime()
         self.testfile.setDatetime(self.timestamps[0])
         self.assertNotEqual(t0, self.testfile.getDatetime())
+        
+    def test_set_datetime_from_index_accepts_custom_regex_pattern(self):
+        """ TODO """
+        pass
+  
+    def test_set_datetime_from_index_accepts_custom_datetime_format(self):
+        """ Optional datetime format can be passed to method setDatetime()"""
+        validIndexes= ["a123prefix2014121215",
+                       "a123prefix201412121523",
+                       "asdahed2014121215",
+                       "asdahed201412121523",]
+        for st in validIndexes:
+            self.testfile.setDatetime(fromIndex=st, datetimeFormat="%Y%m%d%H")
+        
+        self.testfile.setDatetime(fromIndex="index01122014", datetimeFormat="%d%m%Y")
+        t0=self.testfile.getDatetime()
+        self.testfile.setDatetime(fromIndex="index20141201", datetimeFormat="%Y%m%d")
+        t1=self.testfile.getDatetime()
+        self.assertEqual(t0, t1)
     
     def test_set_datetime_from_index(self):
         """ Method setDatetime may be passed fromIndex argument without timestamp """

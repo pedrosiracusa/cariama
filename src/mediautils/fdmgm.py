@@ -18,6 +18,7 @@ import os, time, stat, shutil, errno
 import datetime
 import indexing as indx
 import filecmp
+import re
 from preferences import IMPORTING_ORGANIZE_BY, INDEX_DATETIME_FORMAT, INDEX_DATETIME_LENGTH
 
 __author__ = "Pedro Correia de Siracusa"
@@ -122,12 +123,18 @@ class File:
         os.rename(self.__filePath, newFilePath)
         self.__filePath = newFilePath
         
-    def setIndex(self):
-        """ Sets file index based on indexing rules module """
+    def setIndex(self, force=False):
+        """ 
+        Sets file index based on indexing rules module 
+        @param force: If True, an already indexed file may be re-indexed
+        """
         # only set index if file is not already indexed
         try: # check if name is a valid index (do not re-index the file)
             indx.parseIndex(self.getName())
-            raise indx.FileIndexingError("Could not set index to file (file is already indexed)",self.__filePath, self.getName())
+            if not force:
+                raise indx.FileIndexingError("Could not set index to file (file is already indexed)",self.__filePath, self.getName())
+            else:
+                self.setDatetime(fromIndex=self.getName())
         
         except indx.ParserError: # if file was not already indexed, do it
             try:
@@ -143,23 +150,28 @@ class File:
             except FileExistsError as e:
                 raise indx.FileIndexingError("Could not set index to file (same index already exists)", self.__filePath, index)
                     
-    def setDatetime(self, timestamp=None, mode="am", fromIndex=False):
+    def setDatetime(self, timestamp=None, mode="am", fromIndex=False, indexPattern=None, datetimeFormat=INDEX_DATETIME_FORMAT):
         ''' 
-        TODO: fix typeerror raising: use traceback
-        TODO: Test
+        TODO: test
         Sets file modification or access date using input timestamp
         @param timestamp: timestamp to update. If fromIndex is seto to True it is not required 
         @param mode: type of date (a:atime; m:mtime; am:both)
         '''
+        dateLen = len( time.strftime(datetimeFormat, time.localtime(time.clock())) )
         if fromIndex:
-            try:
-                datestring=indx.parseIndex(fromIndex, 
-                                         '(?P<pref>[A-Za-z]*)(?P<date>\d{'+str(INDEX_DATETIME_LENGTH)+'})(?P<suff>\d*)')['datestring']        
+            if indexPattern is None:
+                regex = '(?P<pref>[A-Za-z]*)(?P<date>\d{'+str(dateLen)+'})' # default index pattern                
+            # Date parsing
+            try:               
+                datestring=re.search(regex, fromIndex).groupdict()['date']
+                timestamp = time.mktime( datetime.datetime.strptime(datestring, datetimeFormat).timetuple() )  
+                               
+            except AttributeError: # parsing failed
+                raise ValueError("No valid datestring was found on input index")
+                                     
             except TypeError as e:
-                raise ValueError("setDatetime() invalid value for forIndex parameter: %s"%fromIndex)
+                raise ValueError("invalid value for forIndex parameter: %s"%fromIndex)
             
-            timestamp = time.mktime( datetime.datetime.strptime(datestring,'%Y%m%d%H%M%S').timetuple() )
-
         elif timestamp is None:
             raise TypeError( "setDatetime() missing required argument: timestamp")
             
@@ -444,27 +456,7 @@ class FileImportingError(OSError):
     pass
 
 def main():
-    # Add to Tests DO NOT ERASE!
-    fpath = r'G:\cariama\mediadb\quarantine\TRDC2014040811402656201.mp4'
-    h = File(fpath)
-    tstmp =1231313.0 #REMOVE
-    h.getDatetime(fromIndex=h.getName())
-    fmt = datetime.datetime.fromtimestamp(tstmp).strftime('%Y/%m/%d %H:%M:%S')
-    print(fmt)
-    
-    h.setDatetime(1296968026.0)
-    tstmp = h.getDatetime()['mtime']
-    fmt = datetime.datetime.fromtimestamp(tstmp).strftime('%Y/%m/%d %H:%M:%S')
-    print(fmt)   
-    
-    h.setDatetime(1296968026.0)
-    tstmp = h.setDatetime(fromIndex=h.getName())
-    tstmp = h.getDatetime()['mtime']
-    fmt = datetime.datetime.fromtimestamp(tstmp).strftime('%Y/%m/%d %H:%M:%S')
-    print(fmt)   
-    
-    index = "MVDC201203041230101"
-    print(File(fpath).setDatetime(fromIndex=index))
+    pass
     
     
 
