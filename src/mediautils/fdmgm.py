@@ -21,6 +21,8 @@ import filecmp
 import re
 from preferences import IMPORTING_ORGANIZE_BY, INDEX_DATETIME_FORMAT, INDEX_DATETIME_LENGTH
 
+import traceback
+
 __author__ = "Pedro Correia de Siracusa"
 __copyright__ = "Copyright 2015, CARIAMA project"
 __credits__ = ["Pedro de Siracusa"]
@@ -90,7 +92,6 @@ class File:
             else: # index parsed successfully
                 return time.mktime(time.strptime(parsedIndx['datestring'], INDEX_DATETIME_FORMAT))
         
-    
     def getSize(self):
         ''' Returns the size of the file, in bytes '''
         if self.exists():
@@ -98,8 +99,16 @@ class File:
         else:
             raise FileNotFoundError("[mediautils.getSize] File not found: %r" %(self.__filePath))
     
-    def getMediaType(self):
-        return(self.__mediaType)
+    def getMediaType(self, fromIndex=False):
+        if fromIndex:
+            try:
+                mtype = indx.parseIndex(self.getName(), 
+                                "(?P<pref>[A-Za-z]+).*", 
+                                ignoreErrors=True)['mediatype']
+                return mtype
+            except KeyError:
+                raise
+        return self.__mediaType
     
     def setMediaType(self, mediaType):
         ''' 
@@ -134,7 +143,7 @@ class File:
             if not force:
                 raise indx.FileIndexingError("Could not set index to file (file is already indexed)",self.__filePath, self.getName())
             else:
-                self.setDatetime(fromIndex=self.getName())
+                self.setDatetime(fromIndex=True)
         
         except indx.ParserError: # if file was not already indexed, do it
             try:
@@ -148,25 +157,26 @@ class File:
                 raise indx.FileIndexingError("Could not format index", self.__filePath, None)
             
             except FileExistsError as e:
-                raise indx.FileIndexingError("Could not set index to file (same index already exists)", self.__filePath, index)
+                raise indx.FileIndexingError("Same index already exists", self.__filePath, index)
                     
     def setDatetime(self, timestamp=None, mode="am", fromIndex=False, indexPattern=None, datetimeFormat=INDEX_DATETIME_FORMAT):
         ''' 
         TODO: test
         Sets file modification or access date using input timestamp
-        @param timestamp: timestamp to update. If fromIndex is seto to True it is not required 
+        @param timestamp: timestamp to update. If fromIndex is set to True it is not required 
         @param mode: type of date (a:atime; m:mtime; am:both)
+        @param fromIndex: If set to True, tries to parse datetime from index. Default=False
+        @param indexPattern: Custom regex for parsing index. Default: $<PREFIX><DATE>
+        @param datetimeFormat: The datetime format to be parsed. Default from preferences
         '''
-        dateLen = len( time.strftime(datetimeFormat, time.localtime(time.clock())) )
         if fromIndex:
             if indexPattern is None:
-                regex = '(?P<pref>[A-Za-z]*)(?P<date>\d{'+str(dateLen)+'})' # default index pattern                
+                regex = '(?P<pref>[A-Za-z]+)(?P<date>\d{'+str(INDEX_DATETIME_LENGTH(datetimeFormat))+'}).*' # default index pattern                
             # Date parsing
-            try:               
-                datestring=re.search(regex, fromIndex).groupdict()['date']
-                timestamp = time.mktime( datetime.datetime.strptime(datestring, datetimeFormat).timetuple() )  
-                               
-            except AttributeError: # parsing failed
+            try: 
+                timestamp = indx.parseIndex(self.getName(), regex, parseDtFormat=datetimeFormat, ignoreErrors=True)['datets']              
+                                              
+            except (KeyError, indx.ParserError): # parsing failed
                 raise ValueError("No valid datestring was found on input index")
                                      
             except TypeError as e:
@@ -373,6 +383,56 @@ class Directory:
     def setMediaType(self, mediaType):
         """ Sets object's media type """
         self.__mediaType = mediaType
+   
+    def checkIntegrity(self, fix=False):
+        """ Checks for dir integrity, with the requisites:
+            1 - Files dates are equivalent to their indexes
+            2 - All files indexes are valid
+            @param fix: If set to True, this methods tries to recursively fix the issues
+            @raise DirectoryIntegrityError: If any issues is detected, exception is raised, with a list of detected issues
+        """
+        import sys
+        issues=[]
+        for f in self.getFiles():
+            try:
+                indx.parseIndex(f.getName());
+                if f.getDatetime()["mtime"]!= f.getDatetime(fromIndex=f.getName()):
+                    raise ValueError(f.getPath(), "Wrong datetime") 
+                
+            except indx.ParserError as e:
+                if fix:
+                    try:
+                        f.setDatetime(fromIndex=True)
+                        f.setMediaType(f.getMediaType(fromIndex=True))
+                        f.setIndex()
+                        if self.checkIntegrity(fix=True):
+                            return True
+                    except ValueError as e:
+                        issues.append( ValueError(f.getPath(), "Index not set" ).with_traceback(e.__traceback__) )
+                else:
+                    issues.append( ValueError(f.getPath(), "Invalid index").with_traceback(e.__traceback__) )
+                    
+            except ValueError as e:
+                if fix:
+                    try:
+                        f.setDatetime(fromIndex=True)
+                        f.setMediaType(f.getMediaType(fromIndex=True))
+                        if self.checkIntegrity(fix=True):
+                            return True
+                    except ValueError as e:
+                        issues.append( ValueError(f.getPath(),"Index not set").with_traceback(e.__traceback__))
+                else:
+                    issues.append( e.with_traceback(e.__traceback__))
+        
+        # base case
+        if len(issues)==0:
+            return True
+        
+        # raise exception
+        if len(issues)>0:
+            raise DirectoryIntegrityError(issues)
+            
+        return
     
     def __str__(self):
         return self.__dirPath
@@ -452,12 +512,28 @@ def importFile(srcFile, dstRootPath, organizeBy=None, copy=True, indexing=False)
     except KeyError as e:
         raise e
 
+
+class DirectoryIntegrityError(Exception):
+    def __init__(self, *args):
+        self.issues = [(issue.__class__.__name__, issue.args) for issue in args[0]]
+
 class FileImportingError(OSError):
     pass
 
 def main():
-    pass
-    
+    import sys
+    #dirPath=r"G:\cariama\mediadb\quarantine\footage"
+    fPath = r"G:\cariama\mediadb\quarantine\othermeta\MVDC2015070209491601.MTS"
+
+    f=File(fPath)
+    print(f.getPath())
+    print(f.getMediaType(fromIndex=True))
+
+
+    #print(Directory(dirPath, "footage").checkIntegrity(fix=True))
+
+
+        #traceback.print_exception(type(exc), exc, exc.__traceback__, limit=2, file=sys.stdout)
     
 
 if __name__=='__main__':

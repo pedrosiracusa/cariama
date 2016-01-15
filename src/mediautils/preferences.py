@@ -16,8 +16,9 @@ INDEX_PREFIX = {
 
 INDEX_SUFFIX_LENGTH = 5;
 INDEX_DATETIME_FORMAT = '%Y%m%d%H%M%S'
-INDEX_DATETIME_LENGTH = len( time.strftime(INDEX_DATETIME_FORMAT, time.localtime(time.clock())) )
-INDEX_PARSING_EXPRESSION = '(?P<pref>[A-Za-z]+)(?P<date>\d{'+str(INDEX_DATETIME_LENGTH)+'})(?P<suff>\d{'+str(INDEX_SUFFIX_LENGTH)+'}$)'
+#INDEX_DATETIME_LENGTH = len( time.strftime(INDEX_DATETIME_FORMAT, time.localtime(time.clock())) )
+INDEX_DATETIME_LENGTH = lambda dtformat=INDEX_DATETIME_FORMAT: len( time.strftime(dtformat, time.localtime(time.clock())) ) 
+INDEX_PARSING_EXPRESSION = '(?P<pref>[A-Za-z]+)(?P<date>\d{'+str(INDEX_DATETIME_LENGTH())+'})(?P<suff>\d{'+str(INDEX_SUFFIX_LENGTH)+'}$)'
 
 
 """ Files Storage and importing preferences """
@@ -28,26 +29,26 @@ IMPORTING_ORGANIZE_BY = { # available organizational methods
                          'PREFIX/date%Y%m': lambda dstRootPath,f:os.path.join(                                               
                                         dstRootPath,
                                         INDEX_PREFIX[f.getMediaType()],
-                                        datetime.fromtimestamp(f.getDate()['mtime']).strftime('%Y'),
-                                        datetime.fromtimestamp(f.getDate()['mtime']).strftime('%m')                           
+                                        datetime.fromtimestamp(f.getDatetime()['mtime']).strftime('%Y'),
+                                        datetime.fromtimestamp(f.getDatetime()['mtime']).strftime('%m')                           
                                         ),
                          
                          'date%Y%b': lambda dstRootPath,f:os.path.join(                                               
                                         dstRootPath,
-                                        datetime.fromtimestamp(f.getDate()['mtime']).strftime('%Y'),
-                                        datetime.fromtimestamp(f.getDate()['mtime']).strftime('%b')                           
+                                        datetime.fromtimestamp(f.getDatetime()['mtime']).strftime('%Y'),
+                                        datetime.fromtimestamp(f.getDatetime()['mtime']).strftime('%b')                           
                                         ),
                          
                          'date%Y%B': lambda dstRootPath,f:os.path.join(                                               
                                         dstRootPath,
-                                        datetime.fromtimestamp(f.getDate()['mtime']).strftime('%Y'),
-                                        datetime.fromtimestamp(f.getDate()['mtime']).strftime('%B')                           
+                                        datetime.fromtimestamp(f.getDatetime()['mtime']).strftime('%Y'),
+                                        datetime.fromtimestamp(f.getDatetime()['mtime']).strftime('%B')                           
                                         ),
                     }
 
 
 def main():
-    pass
+    print(INDEX_DATETIME_LENGTH())
 
 if __name__=="__main__":
     main()

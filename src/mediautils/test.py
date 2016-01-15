@@ -12,6 +12,7 @@ import preferences as prefs
 
 
 class TestFileMethods(unittest.TestCase):
+    validTypes = [t for t in prefs.INDEX_PREFIX.keys()]
     validType = next(iter(prefs.INDEX_PREFIX.keys())) # simple file valid type
     timestamps = [12423523.0, 252353423.0, 48534934.0] # some valid timestamps
     validIndex = indx.genIndex(prefs.INDEX_PREFIX[validType], timestamps[0], 123)
@@ -75,6 +76,12 @@ class TestFileMethods(unittest.TestCase):
     def test_file_cannot_get_size_from_invalid_file(self):
         #TODO
         pass
+    
+    def test_get_mediatype_from_index(self):
+        """ Method getMediatype may parse from index"""
+        self.testfile.setName(self.validIndex)
+        mtype = self.testfile.getMediaType(fromIndex=True)
+        self.assertIn(mtype, self.validTypes)
     
     def test_get_datetime_from_file(self):
         """ Method getDatetime() returns a dict with file's creation, modification and access dates timestamps """
@@ -211,26 +218,36 @@ class TestFileMethods(unittest.TestCase):
   
     def test_set_datetime_from_index_accepts_custom_datetime_format(self):
         """ Optional datetime format can be passed to method setDatetime()"""
-        validIndexes= ["a123prefix2014121215",
-                       "a123prefix201412121523",
+        validIndexes= ["prefix2014121215",
+                       "prefix201412121523",
                        "asdahed2014121215",
                        "asdahed201412121523",]
         for st in validIndexes:
-            self.testfile.setDatetime(fromIndex=st, datetimeFormat="%Y%m%d%H")
+            self.testfile.setName(st)
+            self.testfile.setDatetime(fromIndex=True, datetimeFormat="%Y%m%d%H")
         
-        self.testfile.setDatetime(fromIndex="index01122014", datetimeFormat="%d%m%Y")
+        self.testfile.setName("index01122014")
+        self.testfile.setDatetime(fromIndex=True, datetimeFormat="%d%m%Y")
         t0=self.testfile.getDatetime()
-        self.testfile.setDatetime(fromIndex="index20141201", datetimeFormat="%Y%m%d")
+        self.testfile.setName("index20141201")
+        self.testfile.setDatetime(fromIndex=True, datetimeFormat="%Y%m%d")
         t1=self.testfile.getDatetime()
         self.assertEqual(t0, t1)
     
     def test_set_datetime_from_index(self):
         """ Method setDatetime may be passed fromIndex argument without timestamp """
+        self.testfile.setName("pref2013121213141512345")
         t0 = self.testfile.getDatetime()
-        self.testfile.setDatetime(fromIndex=self.validIndex)
+        self.testfile.setDatetime(fromIndex=True)
         t1 = self.testfile.getDatetime()
         self.assertNotEqual(t0, t1)
-        
+    
+    def test_set_datetime_from_index_raises_exception_if_index_not_parsed(self):
+        """ If index to get datetime from cannot be parsed function raises a value error """
+        invalidIndex = "a123prefix2340"
+        self.testfile.setName(invalidIndex)
+        with self.assertRaises(ValueError):
+            self.testfile.setDatetime(fromIndex=True)
              
     def tearDown(self):
         shutil.rmtree(os.path.abspath("fixtures"))

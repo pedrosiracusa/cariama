@@ -87,7 +87,7 @@ def numberFormatToString(number, length=4, strict=True):
         
     return numString
 
-def parseIndex(index, parseExp = INDEX_PARSING_EXPRESSION):
+def parseIndex(index, parseExp = INDEX_PARSING_EXPRESSION, parseDtFormat = INDEX_DATETIME_FORMAT, ignoreErrors=False):
     """
     Uses regular expressions to validate the input file's index
     This function does not raise any exceptions
@@ -96,24 +96,30 @@ def parseIndex(index, parseExp = INDEX_PARSING_EXPRESSION):
     @return: True if input index is valid
     @return: False if input index is not valid
     """
+    res={}
     try:
         pIdx = re.match(parseExp, index).groupdict()
-        if not pIdx['pref'] in INDEX_PREFIX.values():
-            raise ParserError(1)
+        if 'pref' in pIdx.keys():
+            res['pref']=pIdx['pref']
+            if not pIdx['pref'] in INDEX_PREFIX.values():
+                if not ignoreErrors: raise ParserError(1)  
+            else:
+                res['mediatype']=[key for key, value in INDEX_PREFIX.items() if value==pIdx['pref']][0]    
         
-        try:
-            idxDate=time.strptime(pIdx['date'], INDEX_DATETIME_FORMAT)
-        except ValueError:
-            raise ParserError(2, "Invalid datestring: %s"%pIdx['date'])
+        if 'date' in pIdx.keys():
+            try:
+                res['datestring'] = pIdx['date']                
+                idxDate=time.strptime(pIdx['date'], parseDtFormat)
+                res['datets'] = time.mktime(idxDate)                
+            except ValueError:
+                if not ignoreErrors: raise ParserError(2, "Invalid datestring: %s"%pIdx['date'])
 
-        return{
-                'pref': pIdx['pref'], 
-                'datestring': pIdx['date'],
-                'suff': pIdx['suff'],  
-                'datets': time.mktime(idxDate), 
-                'mediatype' : [key for key, value in INDEX_PREFIX.items() if value==pIdx['pref']],         
-               }
+        if 'suff' in pIdx.keys():
+            res['suff']=pIdx['suff']
+
         
+        return res
+    
     except AttributeError:
         raise ParserError(0)
     
@@ -162,9 +168,8 @@ class ParserError(Exception):
     
     
 def main():
-    index = "MDC2014130412131401234"
-    print(parseIndex(index, INDEX_PARSING_EXPRESSION))
-
+    idx="a123prefix2014121215"
+    print(parseIndex(idx, "(?P<pref>[A-Za-z]+(?P<date>\d.*))", parseDtFormat="%Y%m%d%H", ignoreErrors=True))
         
 if __name__=='__main__':
     main()
