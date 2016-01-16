@@ -78,20 +78,29 @@ class TestFileMethods(unittest.TestCase):
         pass
     
     def test_get_mediatype_from_index(self):
-        """ Method getMediatype may parse from index"""
+        """ Method getMediatype tries to parse from index if attribute is None """
         self.testfile.setName(self.validIndex)
-        mtype = self.testfile.getMediaType(fromIndex=True)
+        mtype = self.testfile.getMediaType()
         self.assertIn(mtype, self.validTypes)
     
     def test_get_datetime_from_file(self):
-        """ Method getDatetime() returns a dict with file's creation, modification and access dates timestamps """
-        timedict = self.testfile.getDatetime()
-        self.assertIsInstance(timedict, dict)
+        """ Method getDatetime() returns a timestamp with file's creation, modification or access dates """
+        self.assertTrue(self.testfile.getDatetime(mode="mtime"))
+        self.assertTrue(self.testfile.getDatetime(mode="atime"))
+        self.assertTrue(self.testfile.getDatetime(mode="ctime"))
         
-        for key in ['ctime', 'mtime', 'atime']:
-            self.assertIn(key, timedict.keys())
+    def test_get_datetime_from_index(self):
+        """ Method getDatetime() can use index to parse datetime """
+        self.testfile.setName("pref20141010131415")
+        self.testfile.getDatetime(fromIndex=True)
+        
+        self.testfile.setName("a20141010131415999999999999999999999999999")
+        self.testfile.getDatetime(fromIndex=True)
+        
+        self.testfile.setName("p10102014")
+        self.testfile.getDatetime(fromIndex=True, indexDtFormat="%d%m%Y")
     
-    def test_get_datetime_from_files_index(self):
+    def test_get_datetime_from_index_independs_of_file_datetime(self):
         """ Method getDatetime() parses file index and returns a timestamp """
         self.testfile.setMediaType(self.validType)
         self.testfile.setDatetime(self.timestamps[0])
@@ -101,6 +110,22 @@ class TestFileMethods(unittest.TestCase):
                              self.testfile.getDatetime()
                             )
     
+    def test_get_datetime_from_index_raises_exception_when_parsing_fails(self):
+        """ If index is not successfully parsed, method getDatetime(fromIndex=True) fails with an exception """
+        self.testfile.setName("MVDC1234invalid")
+        with self.assertRaises(indx.ParserError):
+            self.testfile.getDatetime(fromIndex=True)
+        
+    def test_get_datetime_returns_timestamp_or_formatted(self):
+        """ getDatetime() method may return timestamp of formatted string """
+        self.testfile.setName(self.validIndex)
+        # formatted into a string
+        self.assertIsInstance(self.testfile.getDatetime(format="%Y/%m/%d %H:%M:%S"), str)
+        self.assertIsInstance(self.testfile.getDatetime(format="%Y/%m/%d %H:%M:%S", fromIndex=True), str)
+        # float timestamp
+        self.assertIsInstance(self.testfile.getDatetime(), float)
+        self.assertIsInstance(self.testfile.getDatetime(fromIndex=True), float)
+        
     def test_rename_file_does_not_overwrite(self):
         """ Method .setName does not accidentally overwrite files """
         with self.assertRaises(FileExistsError):
@@ -146,10 +171,11 @@ class TestFileMethods(unittest.TestCase):
     
     def test_copy_file_preserves_date(self):
         """ Method .copyTo preserves file modification and access date """
-        originalTs = self.testfile.getDatetime()
+        originalTsMtime = self.testfile.getDatetime()
+        originalTsAtime= self.testfile.getDatetime(mode="atime")
         newFile = self.testfile.copyTo("fixtures/copy/newfile"+self.testfile.getExt(), preserveDate=True)
-        self.assertEqual(originalTs['mtime'], newFile.getDatetime()['mtime'])
-        self.assertEqual(originalTs['atime'], newFile.getDatetime()['atime'])
+        self.assertEqual(originalTsMtime, newFile.getDatetime())
+        self.assertEqual(originalTsAtime, newFile.getDatetime(mode="atime"))
     
     def test_move_file_does_not_overwrite(self):
         """ Method .moveTo does not accidentally overwrite files """
@@ -556,13 +582,13 @@ class TestIndexing(unittest.TestCase):
         invalidPrefix = "MVTC"
         validPrefix = "MVDC"
         with self.assertRaises(indx.ParserError):
-            indx.genIndex(invalidPrefix, self.testFile.getDatetime()['mtime'], self.testFile.getSize())
+            indx.genIndex(invalidPrefix, self.testFile.getDatetime(), self.testFile.getSize())
         # test for invalid timestamp 
         with self.assertRaises(indx.ParserError):
             indx.genIndex(validPrefix, -2, self.testFile.getSize())
         # test for invalid suffix
         with self.assertRaises(indx.ParserError):
-            indx.genIndex(validPrefix, self.testFile.getDatetime()['mtime'], -2)
+            indx.genIndex(validPrefix, self.testFile.getDatetime(), -2)
           
 
 class TestImporting(unittest.TestCase):
@@ -603,7 +629,7 @@ class TestImporting(unittest.TestCase):
         """ If there is an issue with importing a file by copy or moving, the operation rolls back """
         self.testfile1.setMediaType(self.validMediaType)
         # Error importing at indexing routine: different file already exists with the same index
-        fileIndx = indx.genIndex(indx.getPrefix(self.testfile1.getMediaType()), self.testfile1.getDatetime()['mtime'], self.testfile1.getSize())
+        fileIndx = indx.genIndex(indx.getPrefix(self.testfile1.getMediaType()), self.testfile1.getDatetime(), self.testfile1.getSize())
         diffFile = mgm.importFile(self.testfile2, self.testQuarantine, copy=True, indexing=False)
         diffFile.setName(fileIndx)
         

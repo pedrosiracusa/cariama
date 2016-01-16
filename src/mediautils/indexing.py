@@ -93,8 +93,9 @@ def parseIndex(index, parseExp = INDEX_PARSING_EXPRESSION, parseDtFormat = INDEX
     This function does not raise any exceptions
     @param index: Index string to be parsed
     @param parseExp: Regular expression to be matched
-    @return: True if input index is valid
-    @return: False if input index is not valid
+    @param ignoreErrors: Prevents function from raising errors. Tries to build dictionary as best as possible
+    @return: Dictionary with parsed contents
+    @raise ParserError: If index parsing failed
     """
     res={}
     try:

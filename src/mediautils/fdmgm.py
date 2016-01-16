@@ -72,25 +72,42 @@ class File:
     def getDir(self):
         return(os.path.dirname(self.__filePath))
     
-    def getDatetime(self, fromIndex=False):
+    def getDatetime(self, mode="mtime", format=False, fromIndex=False, indexRePattern=None, indexDtFormat=INDEX_DATETIME_FORMAT):
         ''' 
-        Returns a dict with creation, modification and access dates (timestamps)
+        Returns a dict with creation, modification and access dates
+        @param mode: Specify which mode to use. Default: mtime. Valid modes: mtime, ctime, atime
         @param fromIndex: If True, timestamp is returned from file's index parsing 
                           if False, timestamp is returned from file's metadata (Default)
+        @param format: How to format datetime. If False (Default), timestamp is returned
+        @indexRePattern: Regular Expression pattern to be used to match against parser. Default on method body. Usually do not touch 
+        @indexDtFormat: Datetime format to be parsed from index. Default as in preferences module
+        @raise ValueError: if mode is not valid
+        @raise ParserError: if fromIndex=True and index parsing fails
+        
         '''
         if not fromIndex:
-            return ({'mtime':os.path.getmtime(self.__filePath),
-                    'ctime':os.path.getctime(self.__filePath),
-                    'atime':os.path.getatime(self.__filePath)
-                    })
+            if mode=="mtime":
+                dt = os.path.getmtime(self.__filePath)
+            elif mode=="atime":
+                dt = os.path.getatime(self.__filePath)
+            elif mode=="ctime":
+                dt = os.path.getctime(self.__filePath)
+            else:
+                raise ValueError("Invalid mode: %s"%mode)
+            
         else:
             indxToParse = self.getName()
-            parsedIndx = indx.parseIndex(indxToParse)
-            if not parsedIndx: # in case file is not indexed yet
-                raise indx.ParserError("Index parsing failed: \'%s\'"%indxToParse)
+            # try to parse and raise parser error in case it fails
+            if indexRePattern is None:
+                indexRePattern = '(?P<pref>[A-Za-z]+)(?P<date>\d{'+str(INDEX_DATETIME_LENGTH(indexDtFormat))+'}).*' # default index pattern                             
+            dt = indx.parseIndex(indxToParse, parseExp=indexRePattern, parseDtFormat=indexDtFormat, ignoreErrors=True)['datets']
+            # index parsed successfully
+            
         
-            else: # index parsed successfully
-                return time.mktime(time.strptime(parsedIndx['datestring'], INDEX_DATETIME_FORMAT))
+        # return timestamp or formatted
+        if format:
+            return datetime.datetime.fromtimestamp(dt).strftime(format)
+        return dt
         
     def getSize(self):
         ''' Returns the size of the file, in bytes '''
@@ -99,16 +116,17 @@ class File:
         else:
             raise FileNotFoundError("[mediautils.getSize] File not found: %r" %(self.__filePath))
     
-    def getMediaType(self, fromIndex=False):
-        if fromIndex:
-            try:
+    def getMediaType(self):
+        """ Tries to get media type, if it is none, try to get from index """
+        mtype = self.__mediaType
+        if mtype is None:
+            try: 
                 mtype = indx.parseIndex(self.getName(), 
                                 "(?P<pref>[A-Za-z]+).*", 
                                 ignoreErrors=True)['mediatype']
-                return mtype
             except KeyError:
-                raise
-        return self.__mediaType
+                pass
+        return mtype
     
     def setMediaType(self, mediaType):
         ''' 
@@ -138,7 +156,7 @@ class File:
         @param force: If True, an already indexed file may be re-indexed
         """
         # only set index if file is not already indexed
-        try: # check if name is a valid index (do not re-index the file)
+        try: # check if name is a valid index
             indx.parseIndex(self.getName())
             if not force:
                 raise indx.FileIndexingError("Could not set index to file (file is already indexed)",self.__filePath, self.getName())
@@ -147,8 +165,8 @@ class File:
         
         except indx.ParserError: # if file was not already indexed, do it
             try:
-                indxPref = indx.getPrefix(self.__mediaType)
-                indxDate = self.getDatetime()['mtime']
+                indxPref = indx.getPrefix(self.getMediaType())
+                indxDate = self.getDatetime()
                 indxSuff = self.getSize()
                 index = indx.genIndex(indxPref, indxDate, indxSuff)
                 self.setName(index)
@@ -181,7 +199,8 @@ class File:
                                      
             except TypeError as e:
                 raise ValueError("invalid value for forIndex parameter: %s"%fromIndex)
-            
+        
+        # not in fromIndex mode    
         elif timestamp is None:
             raise TypeError( "setDatetime() missing required argument: timestamp")
             
@@ -396,14 +415,13 @@ class Directory:
         for f in self.getFiles():
             try:
                 indx.parseIndex(f.getName());
-                if f.getDatetime()["mtime"]!= f.getDatetime(fromIndex=f.getName()):
+                if f.getDatetime()!= f.getDatetime(fromIndex=f.getName()):
                     raise ValueError(f.getPath(), "Wrong datetime") 
                 
             except indx.ParserError as e:
                 if fix:
                     try:
                         f.setDatetime(fromIndex=True)
-                        f.setMediaType(f.getMediaType(fromIndex=True))
                         f.setIndex()
                         if self.checkIntegrity(fix=True):
                             return True
@@ -416,7 +434,6 @@ class Directory:
                 if fix:
                     try:
                         f.setDatetime(fromIndex=True)
-                        f.setMediaType(f.getMediaType(fromIndex=True))
                         if self.checkIntegrity(fix=True):
                             return True
                     except ValueError as e:
@@ -521,20 +538,7 @@ class FileImportingError(OSError):
     pass
 
 def main():
-    import sys
-    #dirPath=r"G:\cariama\mediadb\quarantine\footage"
-    fPath = r"G:\cariama\mediadb\quarantine\othermeta\MVDC2015070209491601.MTS"
-
-    f=File(fPath)
-    print(f.getPath())
-    print(f.getMediaType(fromIndex=True))
-
-
-    #print(Directory(dirPath, "footage").checkIntegrity(fix=True))
-
-
-        #traceback.print_exception(type(exc), exc, exc.__traceback__, limit=2, file=sys.stdout)
-    
+    pass
 
 if __name__=='__main__':
     main()
