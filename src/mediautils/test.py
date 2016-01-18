@@ -156,7 +156,7 @@ class TestFileMethods(unittest.TestCase):
         
     def test_copy_file_returns_valid_object(self):
         """ Method .copyTo returns a valid (existing) File object with the same media type and content"""    
-        self.testfile.setMediaType('somemedia')
+        self.testfile.setMediaType(self.validType)
         newFile = self.testfile.copyTo("fixtures/copy/"+self.testfile.getName()+self.testfile.getExt())
         self.assertTrue(newFile.exists())
         self.assertTrue(filecmp.cmp(self.testfile.getPath(), newFile.getPath()), "Different files")
@@ -188,7 +188,7 @@ class TestFileMethods(unittest.TestCase):
             
     def test_move_file_does_not_return_valid_object(self):
         """ Method .moveTo does not return a valid File object, as opposed to copyTo()"""
-        self.testfile.setMediaType('somemedia')
+        self.testfile.setMediaType(self.validType)
         returnVal = self.testfile.moveTo("fixtures/move/newfile" + self.testfile.getExt())
         self.assertIsNone(returnVal)
         
@@ -204,9 +204,6 @@ class TestFileMethods(unittest.TestCase):
         self.testfile.setMediaType(None)
         with self.assertRaises(indx.FileIndexingError):
             self.testfile.setIndex()      
-        self.testfile.setMediaType("Unknown")
-        with self.assertRaises(indx.FileIndexingError):
-            self.testfile.setIndex()
            
     def test_set_index_renames_unindexed_file(self):  
         """ setIndex method successfully indexes non-indexed files """
@@ -503,12 +500,8 @@ class TestIndexing(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(os.path.abspath("fixtures"))
         
-    def test_prefixing_unknown_mediatype_raises_exception(self):
-        """ getPrefix() function raises exception for unknown or None media type """     
-        self.testFile.setMediaType("unknown")        
-        with self.assertRaises(ValueError):
-            indx.getPrefix(self.testFile.getMediaType())
-                         
+    def test_prefixing_undefined_mediatype_raises_exception(self):
+        """ getPrefix() function raises exception for unknown or None media type """                              
         self.testFile.setMediaType(None)
         with self.assertRaises(ValueError):
             indx.getPrefix(self.testFile)

@@ -19,7 +19,7 @@ import datetime
 import indexing as indx
 import filecmp
 import re
-from preferences import IMPORTING_ORGANIZE_BY, INDEX_DATETIME_FORMAT, INDEX_DATETIME_LENGTH
+from preferences import INDEX_PREFIX, IMPORTING_ORGANIZE_BY, INDEX_DATETIME_FORMAT, INDEX_DATETIME_LENGTH
 
 import traceback
 
@@ -34,10 +34,18 @@ __email__ = "pedrosiracusa@gmail.com"
 __status__ = "Development"
 
 class File:
+    """ 
+    Wrapper class for media files 
+    
+    Args:
+        filePath(str): Path for a valid media file.
+        mediatype(str, optional): Media file type. Valid types are listed on preferences module. Defaults to None
+    
+    Attributes:
+        private filePath: The path to file on filesystem
+        private mediatype: The media type for this file
+    """
     def __init__(self, filePath, mediaType=None):
-        '''
-        @param mediatype: Media type. vals: (video-footage, video-trap, photo-trap, audio)
-        '''
         self.__filePath = filePath
         try:
             if not os.path.isfile(self.__filePath):
@@ -48,7 +56,12 @@ class File:
         self.__mediaType = mediaType
  
     def exists(self):
-        ''' Checks whether input file path exists. Defaults to instance's filePath attribute '''
+        """ 
+        Checks whether input file path exists. Defaults to instance's filePath attribute 
+        
+        Returns:
+            True if file exists in filesystem, and False otherwise
+        """
         filePath = self.__filePath
             
         try:
@@ -61,30 +74,57 @@ class File:
             return False       
     
     def getPath(self):
+        """ Retrieves file full path
+        
+        Returns:
+            File path(path)
+        """
         return(self.__filePath)
     
     def getName(self):
+        """ Retrieves file basename, without extension
+        
+        Returns:
+            File name(str)
+        """
         return(os.path.splitext(os.path.basename(self.__filePath))[0])
     
     def getExt(self):
+        """ Retrieves file extension
+        
+        Returns:
+            File extension(str)
+        """
         return(os.path.splitext(self.__filePath)[1])
     
     def getDir(self):
+        """ 
+        Retrieves the dir in which the file is located 
+        
+        Returns:
+            File directory(path)
+        """
         return(os.path.dirname(self.__filePath))
     
     def getDatetime(self, mode="mtime", format=False, fromIndex=False, indexRePattern=None, indexDtFormat=INDEX_DATETIME_FORMAT):
-        ''' 
-        Returns a dict with creation, modification and access dates
-        @param mode: Specify which mode to use. Default: mtime. Valid modes: mtime, ctime, atime
-        @param fromIndex: If True, timestamp is returned from file's index parsing 
-                          if False, timestamp is returned from file's metadata (Default)
-        @param format: How to format datetime. If False (Default), timestamp is returned
-        @indexRePattern: Regular Expression pattern to be used to match against parser. Default on method body. Usually do not touch 
-        @indexDtFormat: Datetime format to be parsed from index. Default as in preferences module
-        @raise ValueError: if mode is not valid
-        @raise ParserError: if fromIndex=True and index parsing fails
-        
-        '''
+        """
+        TODO: change format default to None
+        Returns a dict with creation, modification and access dates.
+            
+        Args:
+            mode (str): Specify which mode to use from ["mtime", "ctime", "atime"]. Defaults to "mtime".
+            format (str, optional): Pattern to format output datetime. If None, timestamp is returned.  Defaults to None.
+            fromIndex (bool, optional): If true, datetime is returned from parsing file's index. Otherwise datetime is returned from file's metadata. Defaults to False.
+            indexRePattern(str, optional): Regular Expression pattern to be used to match against parser. Usually do not touch. Default defined on method body.
+            indexDtFormat(str, optional): Datetime format to be parsed from index. Default set on preferences module.
+
+        Returns:
+            A datetime(str) or a timestamp(float).
+
+        Raises:
+            ValueError: if 'mode' is not valid.
+            ParserError: if 'fromIndex == True and index parsing fails.
+        """
         if not fromIndex:
             if mode=="mtime":
                 dt = os.path.getmtime(self.__filePath)
@@ -110,14 +150,27 @@ class File:
         return dt
         
     def getSize(self):
-        ''' Returns the size of the file, in bytes '''
+        """ Retrieves the size of the file, in bytes 
+        
+        Returns:
+            File size in bytes (int)
+        """
         if self.exists():
             return (os.path.getsize(self.__filePath))
         else:
             raise FileNotFoundError("[mediautils.getSize] File not found: %r" %(self.__filePath))
     
     def getMediaType(self):
-        """ Tries to get media type, if it is none, try to get from index """
+        """ Retrieves file media type
+        
+        Note:
+            This method tries to get media type from its private attribute,
+            and if it is not set, tries to parse it from index prefix, in case
+            file is already indexed
+        
+        Returns:
+            mediaType(str)    
+        """
         mtype = self.__mediaType
         if mtype is None:
             try: 
@@ -126,21 +179,35 @@ class File:
                                 ignoreErrors=True)['mediatype']
             except KeyError:
                 pass
+            
         return mtype
     
     def setMediaType(self, mediaType):
-        ''' 
-            Defines the type of media based on file's extension
+        """
+            Sets file media type
             On next implementations use file headers to define file type
-        @param mediatype: Media type. vals: (video-footage, video-trap, photo-trap, audio)
-        '''      
+            
+        Args:
+            mediatype(str): Media type to be set to file. Valid types are defined on preferences module.
+        
+        Raises ValueError:
+            If input media type is invalid
+        """     
+        if mediaType not in INDEX_PREFIX.keys() and mediaType is not None:
+            raise ValueError("Invalid media type: %s"%mediaType)
+        
         self.__mediaType=mediaType
             
     def setName(self, name):
-        ''' 
-        Renames the basename of the file, without dir nor extension
-        @param name: New name 
-        '''
+        """ 
+        Renames the file, keeping the path and extension
+        
+        Args:
+            name(str): New file name 
+            
+        Raises:
+            FileExistsError: If another file already exists with the same name
+        """
         fileDir = os.path.dirname(self.__filePath)
         fileExt = os.path.splitext(self.__filePath)[1]
         newFilePath = os.path.join(fileDir, name+fileExt)
@@ -151,9 +218,14 @@ class File:
         self.__filePath = newFilePath
         
     def setIndex(self, force=False):
-        """ 
-        Sets file index based on indexing rules module 
-        @param force: If True, an already indexed file may be re-indexed
+        """ Sets file index based on indexing rules module 
+        
+        Args:
+            force(bool, optional): If True, an already indexed file may be re-indexed. Otherwise, re-indexing 
+            does not occurr. Defaults to False
+
+        Raises:
+            FileIndexingError: If method fails to set index to file
         """
         # only set index if file is not already indexed
         try: # check if name is a valid index
@@ -178,15 +250,20 @@ class File:
                 raise indx.FileIndexingError("Same index already exists", self.__filePath, index)
                     
     def setDatetime(self, timestamp=None, mode="am", fromIndex=False, indexPattern=None, datetimeFormat=INDEX_DATETIME_FORMAT):
-        ''' 
-        TODO: test
-        Sets file modification or access date using input timestamp
-        @param timestamp: timestamp to update. If fromIndex is set to True it is not required 
-        @param mode: type of date (a:atime; m:mtime; am:both)
-        @param fromIndex: If set to True, tries to parse datetime from index. Default=False
-        @param indexPattern: Custom regex for parsing index. Default: $<PREFIX><DATE>
-        @param datetimeFormat: The datetime format to be parsed. Default from preferences
-        '''
+        """ Updates file modification and/or access date
+        
+        Args:
+            timestamp(float): Timestamp to be used to update datetime. Not required if fromIndex is True
+            mode(str): Which type of date to use (a:atime; m:mtime; am:both)
+            fromIndex(bool): If True, tries to parse datetime from index and raises error if it fails. Defaults to False
+            indexPattern(str): Custom regex for parsing index. Default is defined on method's body
+            datetimeFormat(str): The datetime format against which to parse index. Default defined on preferences
+            
+        Raises:
+            ValueError: If no valid datestring can be parsed from index
+            ValueError: If input mode is invalid
+            TypeError: If not in fromIndex mode and timestamp is not provided
+        """
         if fromIndex:
             if indexPattern is None:
                 regex = '(?P<pref>[A-Za-z]+)(?P<date>\d{'+str(INDEX_DATETIME_LENGTH(datetimeFormat))+'}).*' # default index pattern                
@@ -196,9 +273,6 @@ class File:
                                               
             except (KeyError, indx.ParserError): # parsing failed
                 raise ValueError("No valid datestring was found on input index")
-                                     
-            except TypeError as e:
-                raise ValueError("invalid value for forIndex parameter: %s"%fromIndex)
         
         # not in fromIndex mode    
         elif timestamp is None:
@@ -219,15 +293,21 @@ class File:
         self.__filePath=None
          
     def copyTo(self, destPath, bufferSize=10485760, preserveDate=True, strict=True):
-        ''' 
-        Copies file from current path to destination. Checks if file already exists on destination before 
-        Optimized for copying large files
-        @param destPath: Destination path
-        @param bufferSize: Buffer size to use during copying. Default = 10MB
-        @param preserveDate: Preserves the original file date. Default = True 
-        @param strict: If false, the same file can be copied with a different name
-        @return: instance of new file object
-        '''
+        """Copies file from current path to destination. Checks if the same file or 
+        another file with the same name already exists on destination before entering the routine
+        
+        Args:
+            destPath(str): Full path to destination, including file name and extension
+            bufferSize(int, optional): Buffer size to use during copying. Defaults to 10MB
+            preserveDate(bool, optional): If true preserves the original file date. Defaults to True
+            strict(bool, optional): If False, the same file may be copied with a different name. Defaults to True
+        
+        Returns:
+            A reference to an instance of a new File object
+            
+        Raises:
+            FileExistsError: If a file with the same name already exists on destination
+        """
         # Make sure target directory exists; create it if necessary
         destDir, destFName = os.path.split(destPath) 
         if not os.path.isdir(destDir):
@@ -257,10 +337,16 @@ class File:
            
     def moveTo(self, destPath, strict=True):
         """
-        Moves file from current path to destination. Checks if file already exists on destination before
-        @param destPath: Destination path
-        @param strict: If false, the same file can be moved with a different name
-        @return: instance of new file object
+        Moves file from current path to destination. Checks if file already exists 
+        on destination before moving. This function does not return a reference to file,
+        but simply moves it and changes path attribute
+        
+        Args:
+            destPath(str): Full path to destination, including file name and extension
+            strict(bool, optional): If False, the file can be moved to a directory where it already exists, with another name
+        
+        Raises:
+            FileExistsError: If a file with the same name already exists on destination
         """
         # Make sure target directory exists; create it if necessary
         destDir, destFName = os.path.split(destPath) 
@@ -281,7 +367,11 @@ class File:
         self.__filePath=destPath
                   
     def delete(self):
-        """ Deletes file object and at filesystem TODO: put a try-catch harness """
+        """ Deletes object and file at filesystem
+        
+        Raises:
+            FileNotFoundError: If object references a  non-existent file
+         """
         if not self.exists():
             raise FileNotFoundError(errno.ENOENT, "Cannot delete a non-existent file", self.__filePath)
         try:
@@ -291,17 +381,25 @@ class File:
             os.remove(self.__filePath)
             
         self.unlink()
-        return None
           
     def __str__(self):
-        '''
-        Print class string representation
-        '''
         return (self.__filePath)
  
     
 class Directory:
-    """ This class represents database directory where files are stored"""
+    """ Wrapper class for directories where media files are stored 
+    
+    Args:
+        dirPath(str): Path for a valid directory.
+        mediatype(str, optional): Directory media type. Valid types are listed on preferences module. Defaults to None
+    
+    Attributes:
+        private filePath: The path to directory on filesystem
+        private mediatype: The media type for this directory
+        
+    Raises:
+        NotADirectoryError: If filePath is not a valid directory
+        """
     def __init__(self, dirPath, mediaType=None):
         self.__dirPath = dirPath
         try:
@@ -313,7 +411,11 @@ class Directory:
         self.__mediaType = mediaType
        
     def exists(self):
-        """ Checks whether input directory path exists. """
+        """ Checks whether object directory path exists
+            
+        Returns:
+            True if object path points to an existing directory and False otherwise
+        """
         dirPath = self.__dirPath           
         try:
             if os.path.isdir(dirPath):
@@ -325,15 +427,34 @@ class Directory:
             return False   
     
     def getPath(self):
+        """ Retrieves object directory path
+        
+        Returns:
+            Directory path (str)
+        """
         return self.__dirPath
     
     def getName(self):
+        """ Retrieves the directory basename
+        
+        Returns:
+            Directory basename (str)
+        """
         return os.path.basename(self.__dirPath)
     
     def getSize(self, recursive=True):
         """ 
-        Returns the size of all files from input directory
-        @param recursive: If recursive, size of files in all subdirectories are also calculated 
+        Returns the size of files inside input directory
+        
+        Args:
+            recursive(bool, optional): If True, size of files in all subdirectories are also calculated, otherwise only
+            files in current level are considered. Defaults to True
+            
+        Returns:
+            Total size of files in bytes (int)
+        
+        Raises:
+            NotADirectoryError: If object is not linked to a real directory in filesystem
         """
         totalSize=0
         if self.exists():
@@ -353,12 +474,26 @@ class Directory:
         return totalSize
     
     def getMediaType(self):
+        """ Retrieves media type from directory
+        
+        Returns:
+            Directory media type (str)
+        """
         return self.__mediaType
         
     def getDirs(self, recursive=True):
         """ 
-        Gets children directories from object (root)
-        @param recursive: If recursive, method looks at all levels. If not, only top level is considered
+        Gets children directories from object
+        
+        Args:
+            recursive(bool, optional): If True, method works recursively, looking for directory on
+            all sublevels. If not, only base level is considered. Defaults to True
+        
+        Returns:
+            Directory objects list (list)
+            
+        Raises:
+            NotADirectoryError: If object path is invalid
         """
         if self.exists():
             if not recursive:
@@ -379,7 +514,16 @@ class Directory:
     def getFiles(self, recursive=True):
         """ 
         Gets file objects from within directory 
-        @param recursive: If recursive, method looks at all levels. If not, only top level is considered    
+        
+        Args:
+            recursive(bool, optional): If True, method works recursively, looking for files on
+            all sublevels. If not, only base level is considered. Defaults to True
+        
+        Returns:
+            File objects list (list)
+            
+        Raises:
+            NotADirectoryError: If object path is invalid
         """
         if self.exists():
             if not recursive:
